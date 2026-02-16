@@ -14,6 +14,6 @@ We are making this **project** as a part of our **DevOps course in Digital Egypt
 
 Develop a system to track inventory in real-time, generate alerts for low stock, and produce reports. we will containerize microservices, use CI/CD pipelines, deploy on Kubernetes, and automate infrastructure with Terraform and Ansible. No AI required — focus is on automation and DevOps practices.
 
-**The assumed tools:**
+**The assumed tools to be used:**
 
 Jenkins, Docker, Kubernetes, Prometheus, Grafana, Ansible, Terraform, AWS EC2/S3/VPC, Nginx, Git
