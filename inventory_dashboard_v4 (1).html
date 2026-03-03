@@ -1,0 +1,1694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inventory Management System</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0e1a;--bg2:#0f172a;--bg3:#1e293b;--bg4:#334155;
+  --blue:#3b82f6;--blue2:#60a5fa;--cyan:#22d3ee;--cyan2:#67e8f9;
+  --green:#34d399;--amber:#fbbf24;--red:#f87171;--purple:#a78bfa;
+  --text:#e2e8f0;--text2:#cbd5e1;--text3:#94a3b8;
+  --sidebar-w:264px;--sidebar-sm:64px;
+}
+body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--bg);min-height:100vh;color:var(--text)}
+
+/* ── LAYOUT ── */
+#sidebar{position:fixed;top:0;left:0;height:100vh;width:var(--sidebar-w);background:#080c1b;border-right:1px solid rgba(59,130,246,.18);display:flex;flex-direction:column;transition:width .26s;z-index:900;overflow:hidden}
+#sidebar.collapsed{width:var(--sidebar-sm)}
+#main{margin-left:var(--sidebar-w);padding:1.75rem;min-height:100vh;transition:margin-left .26s}
+#main.collapsed{margin-left:var(--sidebar-sm)}
+
+/* ── TOGGLE STRIP ── */
+#sb-toggle{position:absolute;top:50%;right:-11px;transform:translateY(-50%);width:11px;height:48px;background:linear-gradient(180deg,var(--blue),var(--cyan));border-radius:0 6px 6px 0;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:910;transition:width .18s,box-shadow .18s;box-shadow:2px 0 8px rgba(59,130,246,.35)}
+#sb-toggle:hover{width:15px;box-shadow:3px 0 14px rgba(59,130,246,.6)}
+.toggle-dots{display:flex;flex-direction:column;gap:3px;pointer-events:none}
+.toggle-dots i{display:block;width:3px;height:3px;background:#fff;border-radius:50%;transition:all .22s}
+#sidebar.collapsed .toggle-dots i:nth-child(1){transform:translateY(3px) rotate(45deg);border-radius:1px;height:2px}
+#sidebar.collapsed .toggle-dots i:nth-child(2){opacity:0}
+#sidebar.collapsed .toggle-dots i:nth-child(3){transform:translateY(-3px) rotate(-45deg);border-radius:1px;height:2px}
+
+/* ── SIDEBAR ── */
+.sb-brand{padding:1.25rem 1rem;border-bottom:1px solid rgba(51,65,85,.3);white-space:nowrap;overflow:hidden}
+.sb-brand h2{background:linear-gradient(135deg,var(--blue2),var(--cyan2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-size:1rem;font-weight:700;transition:opacity .22s}
+#sidebar.collapsed .sb-brand h2{opacity:0}
+.sb-nav{flex:1;padding:.5rem 0;overflow-y:auto;overflow-x:hidden}
+.nav-item{display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;cursor:pointer;transition:all .16s;border-left:3px solid transparent;color:var(--text2);font-size:.875rem;font-weight:500;white-space:nowrap;user-select:none}
+#sidebar.collapsed .nav-item{justify-content:center;padding:.75rem 0}
+.nav-item:hover{background:rgba(59,130,246,.1);color:var(--cyan2)}
+.nav-item.active{background:rgba(59,130,246,.13);border-left-color:var(--cyan);color:var(--cyan2)}
+#sidebar.collapsed .nav-item.active{border-left-color:transparent;border-right:2px solid var(--cyan)}
+.nav-icon{font-size:1.1rem;flex-shrink:0;min-width:20px;text-align:center}
+.nav-label{transition:opacity .22s,width .22s;overflow:hidden}
+#sidebar.collapsed .nav-label{opacity:0;width:0}
+.sb-footer{padding:.875rem;border-top:1px solid rgba(51,65,85,.3)}
+#sidebar.collapsed .sb-footer{padding:.75rem .25rem}
+.user-card{display:flex;align-items:center;gap:.65rem;padding:.65rem .75rem;background:rgba(30,41,59,.5);border-radius:10px;overflow:hidden}
+#sidebar.collapsed .user-card{justify-content:center}
+.avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--cyan));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.8rem;color:#fff;flex-shrink:0;overflow:hidden;text-transform:uppercase}
+.avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.user-info{min-width:0;transition:opacity .22s}
+#sidebar.collapsed .user-info{opacity:0;width:0}
+.user-name{font-size:.8rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-role{font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em}
+
+/* ── CARDS ── */
+.card{background:rgba(15,23,42,.72);border:1px solid rgba(59,130,246,.17);border-radius:14px;backdrop-filter:blur(10px)}
+.card-header{padding:1.1rem 1.25rem;border-bottom:1px solid rgba(51,65,85,.35);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem}
+.card-title{font-size:1rem;font-weight:600}
+.card-body{padding:1.25rem}
+
+/* ── INPUTS ── */
+.inp{width:100%;padding:.65rem .875rem;background:rgba(30,41,59,.7);border:1px solid rgba(71,85,105,.5);border-radius:8px;color:var(--text);font-size:.875rem;font-family:inherit;transition:border .18s}
+.inp:focus{outline:none;border-color:var(--blue2);box-shadow:0 0 0 3px rgba(59,130,246,.12)}
+.inp:disabled{opacity:.5;cursor:not-allowed}
+select.inp option{background:#1e293b}
+.lbl{display:block;font-size:.72rem;font-weight:700;color:var(--text2);margin-bottom:.35rem;text-transform:uppercase;letter-spacing:.04em}
+.fg{margin-bottom:1.1rem}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.1rem}
+
+/* ── RANGE SLIDER ── */
+.col-slider-wrap{display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem;background:rgba(30,41,59,.5);padding:.65rem 1rem;border-radius:9px;border:1px solid rgba(59,130,246,.15)}
+.col-slider-wrap label{font-size:.72rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+input[type=range].col-slider{-webkit-appearance:none;appearance:none;flex:1;height:4px;background:rgba(59,130,246,.25);border-radius:2px;outline:none;cursor:pointer}
+input[type=range].col-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--cyan));cursor:pointer;box-shadow:0 0 6px rgba(59,130,246,.5)}
+input[type=range].col-slider::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--cyan));cursor:pointer;border:none}
+.col-slider-val{font-size:.75rem;font-weight:700;color:var(--cyan);min-width:32px;text-align:right}
+.col-tag{display:inline-flex;align-items:center;gap:.3rem;padding:.25rem .55rem;border-radius:5px;font-size:.72rem;font-weight:600;background:rgba(59,130,246,.15);color:var(--blue2);cursor:pointer;border:1px solid rgba(59,130,246,.25);transition:all .15s;user-select:none}
+.col-tag.hidden-col{background:rgba(71,85,105,.2);color:var(--text3);border-color:rgba(71,85,105,.3)}
+.col-tag:hover{background:rgba(59,130,246,.28)}
+
+/* ── BUTTONS ── */
+.btn{padding:.6rem 1.1rem;border:none;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;font-family:inherit;transition:all .18s;display:inline-flex;align-items:center;gap:.35rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+.btn-primary{background:linear-gradient(135deg,var(--blue),var(--cyan));color:#fff;box-shadow:0 4px 16px rgba(59,130,246,.3)}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(59,130,246,.4)}
+.btn-secondary{background:rgba(71,85,105,.28);color:var(--text);border:1px solid rgba(71,85,105,.4)}
+.btn-secondary:hover{background:rgba(71,85,105,.45)}
+.btn-danger{background:rgba(248,113,113,.14);color:var(--red);border:1px solid rgba(248,113,113,.32)}
+.btn-danger:hover{background:rgba(248,113,113,.28)}
+.btn-success{background:rgba(52,211,153,.14);color:var(--green);border:1px solid rgba(52,211,153,.32)}
+.btn-success:hover{background:rgba(52,211,153,.28)}
+.btn-amber{background:rgba(251,191,36,.14);color:var(--amber);border:1px solid rgba(251,191,36,.32)}
+.btn-amber:hover{background:rgba(251,191,36,.28)}
+.btn-sm{padding:.3rem .65rem;font-size:.72rem}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
+
+/* ── BADGES ── */
+.badge{display:inline-block;padding:.2rem .5rem;border-radius:5px;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.badge-success{background:rgba(52,211,153,.18);color:var(--green)}
+.badge-warning{background:rgba(251,191,36,.18);color:var(--amber)}
+.badge-danger{background:rgba(248,113,113,.18);color:var(--red)}
+.badge-info{background:rgba(59,130,246,.18);color:var(--blue2)}
+
+/* ── TABLE ── */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+thead{background:rgba(30,41,59,.55)}
+th{padding:.65rem .875rem;text-align:left;font-size:.68rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+td{padding:.75rem .875rem;border-top:1px solid rgba(51,65,85,.22);font-size:.835rem}
+tbody tr{transition:background .13s}
+tbody tr:hover{background:rgba(59,130,246,.05)}
+tr.tr-sub{background:rgba(10,14,26,.5)!important}
+tr.tr-sub td{font-size:.78rem;padding:.55rem .875rem}
+tr.tr-expanded{background:rgba(59,130,246,.08)!important}
+
+/* ── STATS ── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:1.1rem;margin-bottom:1.5rem}
+.stat-card{background:rgba(15,23,42,.65);border:1px solid rgba(59,130,246,.17);border-radius:14px;padding:1.1rem;position:relative;overflow:hidden;transition:transform .18s,box-shadow .18s}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--blue2),var(--cyan))}
+.stat-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.stat-lbl{font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-bottom:.4rem}
+.stat-val{font-size:1.9rem;font-weight:700;background:linear-gradient(135deg,#fff,var(--text2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1}
+.stat-icon{position:absolute;top:1rem;right:1rem;font-size:1.3rem;opacity:.6}
+
+/* ── PAGE TITLES ── */
+.page-title{font-size:1.65rem;font-weight:700;margin-bottom:.25rem;background:linear-gradient(135deg,#fff,var(--text2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.page-sub{color:var(--text3);font-size:.875rem;margin-bottom:1.5rem}
+
+/* ── ALERTS ── */
+.alert-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.75rem;margin-bottom:1.25rem}
+.alert-count-card{border-radius:10px;padding:.875rem;text-align:center;background:rgba(15,23,42,.65);border:1px solid rgba(59,130,246,.15)}
+.alert-count-num{font-size:2rem;font-weight:700;line-height:1}
+.alert-count-lbl{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:.3rem;color:var(--text3)}
+.alert-bar{height:6px;border-radius:3px;background:rgba(51,65,85,.5);margin-top:.875rem;overflow:hidden}
+.alert-bar-fill{height:100%;border-radius:3px;transition:width .5s ease}
+.alert-item{display:flex;align-items:center;gap:1rem;padding:.8rem 1.1rem;border-radius:9px;margin-bottom:.5rem;background:rgba(15,23,42,.6);border-left:3px solid var(--amber);transition:background .15s}
+.alert-item.crit{border-left-color:var(--red);background:rgba(248,113,113,.06)}
+.alert-item:hover{background:rgba(30,41,59,.7)}
+.alert-resolve{background:rgba(52,211,153,.14);border:1px solid rgba(52,211,153,.3);color:var(--green);padding:.28rem .7rem;border-radius:6px;cursor:pointer;font-size:.72rem;font-weight:700;white-space:nowrap;transition:background .15s;font-family:inherit}
+.alert-resolve:hover{background:rgba(52,211,153,.28)}
+
+/* ── PRODUCT BREAKDOWN BARS ── */
+.prod-bar-row{display:flex;align-items:center;gap:.75rem;margin-bottom:.65rem}
+.prod-bar-name{font-size:.78rem;font-weight:600;color:var(--text2);width:140px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prod-bar-track{flex:1;height:10px;background:rgba(51,65,85,.45);border-radius:5px;overflow:hidden;min-width:60px}
+.prod-bar-fill{height:100%;border-radius:5px;transition:width .5s ease}
+.prod-bar-val{font-size:.75rem;font-weight:700;color:var(--cyan);width:44px;text-align:right;flex-shrink:0}
+
+/* ── MODAL ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000;padding:1rem}
+.modal{background:#0a0e1e;border:1px solid rgba(59,130,246,.22);border-radius:16px;padding:1.5rem;width:100%;max-width:620px;max-height:90vh;overflow-y:auto}
+.modal-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.1rem;padding-bottom:.75rem;border-bottom:1px solid rgba(51,65,85,.3)}
+.modal-title{font-size:1.05rem;font-weight:700}
+.modal-close{width:28px;height:28px;border-radius:50%;background:rgba(248,113,113,.18);border:none;color:var(--red);cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;transition:background .15s;font-family:inherit}
+.modal-close:hover{background:rgba(248,113,113,.35)}
+
+/* ── LOGIN ── */
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:1.5rem;background:linear-gradient(135deg,var(--bg),#0a1628)}
+.login-box{background:rgba(15,23,42,.88);border:1px solid rgba(59,130,246,.2);border-radius:18px;padding:2.25rem;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.55)}
+.login-logo{text-align:center;margin-bottom:1.75rem}
+.login-logo h1{font-size:1.4rem;font-weight:700;background:linear-gradient(135deg,var(--blue2),var(--cyan2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-top:.5rem}
+.login-logo p{font-size:.78rem;color:var(--text3)}
+
+/* ── WELCOME ── */
+.welcome-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,var(--bg),#0a1628)}
+.welcome-box{background:rgba(15,23,42,.88);border:1px solid rgba(59,130,246,.2);border-radius:18px;padding:3rem;max-width:520px;width:100%;text-align:center}
+
+/* ── TABS ── */
+.tabs{display:flex;gap:.15rem;margin-bottom:1.25rem;border-bottom:1px solid rgba(51,65,85,.3)}
+.tab-btn{padding:.6rem 1.1rem;background:none;border:none;color:var(--text3);cursor:pointer;font-size:.78rem;font-weight:700;font-family:inherit;border-bottom:2px solid transparent;transition:all .15s;text-transform:uppercase;letter-spacing:.04em}
+.tab-btn:hover{color:var(--cyan2)}
+.tab-btn.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+
+/* ── LOG ── */
+.log-item{padding:.65rem .9rem;border-radius:8px;border-left:3px solid rgba(59,130,246,.3);background:rgba(30,41,59,.42);margin-bottom:.4rem;transition:background .13s}
+.log-item:hover{background:rgba(30,41,59,.7)}
+
+/* ── QTY CTRL ── */
+.qty-ctrl{display:inline-flex;align-items:center;gap:.35rem}
+.qty-btn{width:24px;height:24px;border-radius:5px;border:1px solid rgba(59,130,246,.28);background:rgba(59,130,246,.1);color:var(--blue2);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.95rem;font-weight:700;transition:all .13s;user-select:none;flex-shrink:0}
+.qty-btn:hover{background:rgba(59,130,246,.25);border-color:var(--blue2)}
+.qty-val{min-width:38px;text-align:center;font-weight:600;font-size:.835rem}
+
+/* ── EXPAND ── */
+.expand-btn{background:none;border:none;color:var(--blue2);cursor:pointer;font-size:.82rem;padding:.2rem .35rem;transition:transform .18s;display:inline-flex;align-items:center;font-family:inherit}
+.expand-btn.open{transform:rotate(90deg)}
+
+/* ── LOC BADGE ── */
+.loc-badge{background:rgba(34,211,238,.14);color:var(--cyan2);padding:.18rem .5rem;border-radius:4px;font-size:.72rem;font-weight:600}
+
+/* ── MISC ── */
+.search-inp{padding:.55rem .875rem;background:rgba(30,41,59,.65);border:1px solid rgba(71,85,105,.4);border-radius:8px;color:var(--text);font-size:.835rem;font-family:inherit;transition:border .18s}
+.search-inp:focus{outline:none;border-color:var(--blue2)}
+.spinner-wrap{display:flex;align-items:center;justify-content:center;padding:4rem}
+.spinner{width:38px;height:38px;border:3px solid rgba(59,130,246,.18);border-top-color:var(--blue2);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err-box{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);border-radius:8px;padding:.65rem .9rem;color:var(--red);font-size:.835rem;margin-bottom:1rem}
+.charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:1.1rem;margin-bottom:1.5rem}
+.hidden{display:none!important}
+.flex{display:flex}.items-center{align-items:center}.justify-between{justify-content:space-between}.gap1{gap:.5rem}.gap2{gap:.875rem}.flex-wrap{flex-wrap:wrap}
+.text-sm{font-size:.8rem}.text-xs{font-size:.72rem}.text-muted{color:var(--text3)}
+.mt1{margin-top:.5rem}.mt2{margin-top:1rem}.mb1{margin-bottom:.5rem}.mb2{margin-bottom:1rem}
+.fw6{font-weight:600}.fw7{font-weight:700}.w100{width:100%}
+
+/* ── EMPLOYEE LANDING ── */
+.emp-landing{text-align:center;padding:3rem 1.5rem}
+.emp-landing h2{font-size:1.5rem;font-weight:700;margin-bottom:.5rem;background:linear-gradient(135deg,var(--blue2),var(--cyan2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.emp-stat-row{display:flex;gap:1.1rem;justify-content:center;flex-wrap:wrap;margin-top:2rem}
+.emp-stat{background:rgba(15,23,42,.65);border:1px solid rgba(59,130,246,.17);border-radius:14px;padding:1.5rem 2rem;text-align:center}
+.emp-stat-val{font-size:2.5rem;font-weight:700;background:linear-gradient(135deg,var(--cyan),var(--blue2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.emp-stat-lbl{font-size:.78rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-top:.4rem;font-weight:600}
+
+@media(max-width:768px){#sidebar{width:var(--sidebar-sm)} #sidebar .nav-label,#sidebar .sb-brand h2,#sidebar .user-info{opacity:0;width:0} #main{margin-left:var(--sidebar-sm)} .charts-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- ═════ LOGIN ═════ -->
+<div id="view-login">
+  <div class="login-wrap">
+    <div class="login-box">
+      <div class="login-logo">
+        <div style="font-size:2.5rem">📦</div>
+        <h1>Inventory System</h1>
+        <p>// Enterprise Portal</p>
+      </div>
+      <div id="login-error" class="err-box hidden"></div>
+      <div class="fg"><label class="lbl">Username</label><input class="inp" id="inp-user" type="text" autocomplete="username"></div>
+      <div class="fg" style="margin-bottom:1.5rem"><label class="lbl">Password</label><input class="inp" id="inp-pass" type="password" autocomplete="current-password"></div>
+      <button class="btn btn-primary" id="btn-login" style="width:100%;justify-content:center">→ Sign In</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═════ WELCOME ═════ -->
+<div id="view-welcome" class="hidden">
+  <div class="welcome-wrap">
+    <div class="welcome-box">
+      <div style="font-size:3rem;margin-bottom:1rem">👋</div>
+      <p style="color:var(--text3);margin-bottom:.4rem;font-size:.875rem">Welcome back,</p>
+      <div id="welcome-name" style="font-size:2.2rem;font-weight:700;background:linear-gradient(135deg,var(--blue2),var(--cyan2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:.75rem"></div>
+      <p id="welcome-role" style="color:var(--text3);margin-bottom:2.5rem;font-size:.875rem"></p>
+      <button class="btn btn-primary" id="btn-proceed" style="padding:1rem 2.5rem;font-size:.9rem">Go to Dashboard →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═════ MAIN APP ═════ -->
+<div id="view-app" class="hidden">
+  <div id="sidebar">
+    <div id="sb-toggle"><div class="toggle-dots"><i></i><i></i><i></i></div></div>
+    <div class="sb-brand"><h2>📦 Inventory Pro</h2></div>
+    <div class="sb-nav" id="sb-nav"></div>
+    <div class="sb-footer">
+      <div class="user-card">
+        <div class="avatar" id="sb-avatar"></div>
+        <div class="user-info">
+          <div class="user-name" id="sb-username"></div>
+          <div class="user-role" id="sb-role"></div>
+          <div id="sb-loc" style="font-size:.66rem;color:var(--cyan);margin-top:.1rem"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="main">
+
+    <!-- DASHBOARD (admin + manager only) -->
+    <div id="page-dashboard" class="hidden">
+      <div class="page-title">Dashboard Overview</div>
+      <div class="page-sub">Real-time inventory analytics</div>
+      <div class="stats-grid" id="stats-grid"></div>
+      <div class="charts-grid">
+        <div class="card">
+          <div class="card-header"><div class="card-title">📈 Inventory Trend</div></div>
+          <div class="card-body"><div style="height:230px"><canvas id="chart-line"></canvas></div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">🍩 Items by Category</div></div>
+          <div class="card-body"><div style="height:230px"><canvas id="chart-donut"></canvas></div></div>
+        </div>
+      </div>
+
+      <!-- NEW: All items pie + individual breakdown -->
+      <div class="charts-grid">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🥧 All Products — Quantity Share</div>
+            <span class="text-xs text-muted">Slice size = units in stock</span>
+          </div>
+          <div class="card-body"><div style="height:260px"><canvas id="chart-items-pie"></canvas></div></div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📊 Individual Stock Levels</div>
+            <span class="text-xs text-muted">Per product unit count</span>
+          </div>
+          <div class="card-body">
+            <div id="prod-breakdown" style="max-height:260px;overflow-y:auto;padding-right:.35rem"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ALERTS section -->
+      <div id="alerts-section"></div>
+    </div>
+
+    <!-- EMPLOYEE LANDING (employees see this as "dashboard") -->
+    <div id="page-employee-home" class="hidden">
+      <div class="page-title">My Workspace</div>
+      <div class="page-sub" id="emp-sub"></div>
+      <div class="emp-stat-row" id="emp-stats"></div>
+      <div style="margin-top:2.5rem">
+        <div class="card">
+          <div class="card-header"><div class="card-title">📦 Items at My Location</div></div>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Name</th><th>SKU</th><th>Qty</th><th>Min</th><th>Status</th></tr></thead>
+            <tbody id="emp-items-tbody"></tbody>
+          </table></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- INVENTORY -->
+    <div id="page-inventory" class="hidden">
+      <div class="page-title">Inventory Management</div>
+      <div class="page-sub">Click ▶ on any row to manage warehouse quantities</div>
+      <div class="flex gap2 flex-wrap items-center" style="margin-bottom:.75rem">
+        <button class="btn btn-primary" id="btn-add-item">+ New Item</button>
+        <input class="search-inp" id="inv-search" placeholder="🔍 Search name, SKU, category…" style="width:260px">
+      </div>
+      <!-- Column visibility slider -->
+      <div class="col-slider-wrap" id="col-slider-wrap">
+        <label>Columns</label>
+        <div id="col-tags" style="display:flex;gap:.4rem;flex-wrap:wrap;flex:1"></div>
+      </div>
+      <div id="add-item-form" class="card hidden" style="margin-bottom:1.1rem"></div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">All Items <span id="inv-count" style="color:var(--text3);font-weight:400;font-size:.8rem"></span></div>
+          <span class="text-sm text-muted">▶ = expand warehouses</span>
+        </div>
+        <div class="tbl-wrap"><table id="inv-table">
+          <thead id="inv-thead"></thead>
+          <tbody id="inv-tbody"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- LOCATIONS -->
+    <div id="page-locations" class="hidden">
+      <div class="page-title">Locations</div>
+      <div class="page-sub">Manage and edit warehouse locations</div>
+      <button class="btn btn-primary" id="btn-add-loc" style="margin-bottom:1.1rem">+ Add Location</button>
+      <div id="add-loc-form" class="card hidden" style="margin-bottom:1.1rem"></div>
+      <div class="card"><div class="tbl-wrap"><table>
+        <thead><tr><th>ID</th><th>Name</th><th>Address</th><th>Created</th><th>Actions</th></tr></thead>
+        <tbody id="loc-tbody"></tbody>
+      </table></div></div>
+    </div>
+
+    <!-- CONTACTS -->
+    <div id="page-contacts" class="hidden">
+      <div class="page-title">📞 Contacts</div>
+      <div class="page-sub">Employee contact directory</div>
+      <div class="card"><div class="tbl-wrap"><table>
+        <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Location</th></tr></thead>
+        <tbody id="contacts-tbody"></tbody>
+      </table></div></div>
+    </div>
+
+    <!-- USERS -->
+    <div id="page-users" class="hidden">
+      <div class="page-title">User Management</div>
+      <div class="page-sub" id="users-sub"></div>
+      <div id="users-add-wrap">
+        <button class="btn btn-primary" id="btn-add-user" style="margin-bottom:1.1rem">+ Add User</button>
+      </div>
+      <div id="add-user-form" class="card hidden" style="margin-bottom:1.1rem"></div>
+      <div class="card"><div class="tbl-wrap"><table>
+        <thead><tr><th>Username</th><th>Full Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Location</th><th>Last Login</th><th id="users-act-th"></th></tr></thead>
+        <tbody id="users-tbody"></tbody>
+      </table></div></div>
+    </div>
+
+    <!-- REPORTS -->
+    <div id="page-reports" class="hidden">
+      <div class="page-title">📋 Reports</div>
+      <div class="page-sub">Activity logs, analytics exports, and PDF generation</div>
+      <div class="tabs">
+        <button class="tab-btn active" data-rtab="logs">📝 Activity Log</button>
+        <button class="tab-btn" data-rtab="pdf">📄 PDF Export</button>
+      </div>
+      <div id="report-err" class="err-box hidden"></div>
+      <div id="rtab-logs">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Activity Log</div>
+            <div class="flex gap1 items-center flex-wrap">
+              <select class="inp" id="log-days" style="width:auto;padding:.38rem .7rem;font-size:.78rem">
+                <option value="7">Last 7 days</option>
+                <option value="30" selected>Last 30 days</option>
+                <option value="90">Last 90 days</option>
+                <option value="365">Last year</option>
+              </select>
+              <button class="btn btn-secondary btn-sm" id="btn-refresh-log">↻ Refresh</button>
+              <button class="btn btn-primary btn-sm" id="btn-dl-log-pdf">⬇ Download as PDF</button>
+            </div>
+          </div>
+          <div class="card-body"><div id="log-list" style="max-height:560px;overflow-y:auto"></div></div>
+        </div>
+      </div>
+      <div id="rtab-pdf" class="hidden">
+        <div class="card">
+          <div class="card-header"><div class="card-title">📊 Comprehensive Inventory Report</div></div>
+          <div class="card-body">
+            <p class="text-sm text-muted" style="margin-bottom:1.1rem;line-height:1.75">Generates a full PDF with inventory overview, alert summary, user statistics, and top category breakdown.</p>
+            <div id="pdf-preview" style="background:rgba(30,41,59,.5);border-radius:9px;padding:.875rem;margin-bottom:1.1rem;font-size:.82rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.5rem"></div>
+            <button class="btn btn-primary" id="btn-gen-pdf">⬇ Download PDF</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div id="page-settings" class="hidden">
+      <div class="page-title">⚙️ Settings</div>
+      <div class="page-sub">Manage your account preferences</div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">👤 My Profile</div></div>
+        <div class="card-body">
+          <div style="text-align:center;margin-bottom:1.5rem">
+            <div class="avatar" id="settings-avatar" style="width:88px;height:88px;font-size:1.9rem;margin:0 auto .65rem"></div>
+            <label class="btn btn-secondary btn-sm" style="cursor:pointer">Change Photo<input type="file" id="photo-file" accept="image/*" style="display:none"></label>
+          </div>
+          <div class="fgrid" id="settings-fields"></div>
+          <button class="btn btn-primary" id="btn-save-settings" style="margin-top:.5rem">Save Changes</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /view-app -->
+
+<!-- MODALS -->
+<div id="modal-edit-item" class="overlay hidden">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title" id="edit-item-title">Edit Item</div><button class="modal-close" data-close="modal-edit-item">×</button></div>
+    <div id="edit-item-body"></div>
+  </div>
+</div>
+<div id="modal-edit-user" class="overlay hidden">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title">✏️ Edit User</div><button class="modal-close" data-close="modal-edit-user">×</button></div>
+    <div id="edit-user-body"></div>
+  </div>
+</div>
+<div id="modal-edit-loc" class="overlay hidden">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-hdr"><div class="modal-title">✏️ Edit Location</div><button class="modal-close" data-close="modal-edit-loc">×</button></div>
+    <div id="edit-loc-body"></div>
+  </div>
+</div>
+
+<!-- RESOLVE ALERT MODAL -->
+<div id="modal-resolve" class="overlay hidden">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-hdr">
+      <div>
+        <div class="modal-title" id="resolve-title">🔧 Resolve Alert</div>
+        <div style="font-size:.78rem;color:var(--text3);margin-top:.2rem" id="resolve-sub"></div>
+      </div>
+      <button class="modal-close" data-close="modal-resolve">×</button>
+    </div>
+    <div id="resolve-body"></div>
+  </div>
+</div>
+
+<!-- NOTIF PERMISSION BANNER -->
+<div id="notif-banner" class="hidden" style="position:fixed;bottom:1.25rem;right:1.25rem;background:rgba(10,14,30,.97);border:1px solid rgba(59,130,246,.35);border-radius:12px;padding:1rem 1.25rem;max-width:320px;z-index:2000;box-shadow:0 8px 30px rgba(0,0,0,.55)">
+  <div style="font-weight:700;margin-bottom:.4rem;font-size:.9rem">🔔 Enable Notifications</div>
+  <div style="font-size:.78rem;color:var(--text3);margin-bottom:.875rem;line-height:1.6">Get Chrome notifications when new stock alerts arrive.</div>
+  <div style="display:flex;gap:.65rem">
+    <button class="btn btn-primary btn-sm" id="notif-allow">Allow</button>
+    <button class="btn btn-secondary btn-sm" id="notif-deny">Not now</button>
+  </div>
+</div>
+
+<script>
+/* ═══════════ CONFIG ═══════════ */
+const API   = 'http://127.0.0.1:5000';
+const ALERT = 'http://127.0.0.1:5001';
+const RPRT  = 'http://127.0.0.1:5002';
+
+let state = {
+  user: null, items: [], locations: [], alerts: [], analytics: null,
+  expanded: null, stockCache: {}, alertInterval: null, charts: {},
+  logCache: [],
+  hiddenCols: new Set(),
+  prevAlertIds: new Set(),   // track seen alert IDs for notifications
+};
+
+/* ═══════════ UTILS ═══════════ */
+const $  = id => document.getElementById(id);
+const token    = () => localStorage.getItem('token');
+const initials = (n='?') => n.split(' ').map(p=>p[0]||'').join('').toUpperCase().slice(0,2);
+const fmtDate  = d => d ? new Date(d).toLocaleDateString() : 'Never';
+const fmtMoney = n => '$' + (parseFloat(n)||0).toFixed(2);
+const isAdmin  = () => state.user && state.user.role === 'admin';
+const isMgr    = () => state.user && (state.user.role === 'admin' || state.user.role === 'manager');
+
+function show(id){ const e=$(id); if(e) e.classList.remove('hidden'); }
+function hide(id){ const e=$(id); if(e) e.classList.add('hidden'); }
+function showOnly(...ids){
+  ['view-login','view-welcome','view-app'].forEach(v=>hide(v));
+  ids.forEach(id=>show(id));
+}
+function showPage(pg){
+  ['dashboard','employee-home','inventory','locations','contacts','users','reports','settings']
+    .forEach(p=>hide('page-'+p));
+  show('page-'+pg);
+  document.querySelectorAll('.nav-item').forEach(el=>el.classList.toggle('active', el.dataset.page===pg));
+}
+
+/* ═══════════ API ═══════════ */
+async function apiFetch(base, path, opts={}) {
+  const headers = {'Content-Type':'application/json'};
+  if (token()) headers['Authorization'] = 'Bearer ' + token();
+  const resp = await fetch(base+path, {...opts, headers});
+  if (resp.status===401){ doLogout(); return null; }
+  let data={}; try{ data=await resp.json(); }catch(e){}
+  if (!resp.ok) throw new Error(data.error||'Request failed ('+resp.status+')');
+  return data;
+}
+const A  = (p,o)=>apiFetch(API, p, o);
+const AR = (p,o)=>apiFetch(RPRT, p, o);
+async function alertFetch(path, opts={}){
+  try{ const r=await fetch(ALERT+path, opts); return r.ok?r.json():[]; }catch{ return []; }
+}
+const jbody = (method,body) => ({method, body:JSON.stringify(body)});
+
+/* ═══════════ LOGIN ═══════════ */
+$('btn-login').addEventListener('click', async()=>{
+  const username=$('inp-user').value.trim(), password=$('inp-pass').value;
+  if(!username||!password) return;
+  $('btn-login').disabled=true; $('btn-login').textContent='Signing in…'; hide('login-error');
+  try{
+    const data=await apiFetch(API,'/auth/login',jbody('POST',{username,password}));
+    localStorage.setItem('token',data.token); localStorage.setItem('user',JSON.stringify(data.user));
+    state.user=data.user; showWelcome();
+  }catch(err){ $('login-error').textContent=err.message; show('login-error'); }
+  finally{ $('btn-login').disabled=false; $('btn-login').textContent='→ Sign In'; }
+});
+$('inp-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') $('btn-login').click(); });
+
+/* ═══════════ WELCOME ═══════════ */
+function showWelcome(){
+  const u=state.user;
+  $('welcome-name').textContent=u.full_name;
+  $('welcome-role').textContent=u.role.toUpperCase()+' · Inventory Management System';
+  showOnly('view-welcome');
+}
+$('btn-proceed').addEventListener('click',()=>{ showOnly('view-app'); initApp(); });
+
+/* ═══════════ LOGOUT ═══════════ */
+function doLogout(){
+  clearInterval(state.alertInterval); localStorage.clear();
+  state={user:null,items:[],locations:[],alerts:[],analytics:null,expanded:null,stockCache:{},alertInterval:null,charts:{},logCache:[],hiddenCols:new Set()};
+  showOnly('view-login');
+}
+
+/* ═══════════ SIDEBAR ═══════════ */
+function buildSidebar(){
+  const u=state.user;
+  const mgr=isMgr();
+  const pages=[
+    {id: mgr?'dashboard':'employee-home', icon:'📊', label:'Dashboard'},
+    {id:'inventory', icon:'📦', label:'Inventory'},
+    ...(mgr?[
+      {id:'locations',icon:'📍',label:'Locations'},
+      {id:'contacts', icon:'📞',label:'Contacts'},
+      {id:'users',    icon:'👥',label:'Users'},
+      {id:'reports',  icon:'📋',label:'Reports'},
+    ]:[]),
+    {id:'settings',icon:'⚙️',label:'Settings'},
+    {id:'__logout',icon:'🚪',label:'Logout'},
+  ];
+  const nav=$('sb-nav');
+  const homePage = mgr ? 'dashboard' : 'employee-home';
+  nav.innerHTML=pages.map(p=>`
+    <div class="nav-item${p.id===homePage?' active':''}" data-page="${p.id}">
+      <span class="nav-icon">${p.icon}</span>
+      <span class="nav-label">${p.label}</span>
+    </div>`).join('');
+  nav.querySelectorAll('.nav-item').forEach(el=>{
+    el.addEventListener('click',()=>{
+      if(el.dataset.page==='__logout'){doLogout();return;}
+      showPage(el.dataset.page); loadPage(el.dataset.page);
+    });
+  });
+  $('sb-avatar').textContent=initials(u.full_name);
+  $('sb-username').textContent=u.full_name;
+  $('sb-role').textContent=u.role;
+  if(u.location_name) $('sb-loc').textContent='📍 '+u.location_name;
+  $('sb-toggle').addEventListener('click',()=>{
+    $('sidebar').classList.toggle('collapsed');
+    $('main').classList.toggle('collapsed');
+  });
+  document.querySelectorAll('.modal-close').forEach(btn=>btn.addEventListener('click',()=>hide(btn.dataset.close)));
+  document.querySelectorAll('.overlay').forEach(ov=>ov.addEventListener('click',e=>{ if(e.target===ov) ov.classList.add('hidden'); }));
+}
+
+/* ═══════════════════════════════════════════════
+   CHROME NOTIFICATIONS
+═══════════════════════════════════════════════ */
+function fireNotification(alert){
+  if(!('Notification' in window)) return;
+  if(Notification.permission!=='granted') return;
+  const isOos=alert.alert_type==='out_of_stock';
+  const title=isOos?'❌ Out of Stock':'⚠️ Low Stock Alert';
+  const body=`${alert.item_name||'Item'} · Qty: ${alert.quantity??'?'} (min: ${alert.min_quantity??'?'})`;
+  try{
+    const n=new Notification(title,{
+      body,
+      icon:'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>',
+      tag:'inv-alert-'+alert.id,
+      requireInteraction:isOos,
+    });
+    n.onclick=()=>{ window.focus(); n.close(); };
+    if(!isOos) setTimeout(()=>n.close(),8000);
+  }catch(e){ console.warn('Notification failed:',e); }
+}
+
+function requestNotifPermission(){
+  if(!('Notification' in window)) return;
+  if(Notification.permission==='granted') return;
+  if(Notification.permission==='denied') return;
+  // Show our custom banner instead of immediately prompting
+  show('notif-banner');
+}
+
+/* ═══════════════════════════════════════════════
+   INIT APP
+═══════════════════════════════════════════════ */
+async function initApp(){
+  buildSidebar();
+  // Ask for notification permission via our custom banner
+  requestNotifPermission();
+  const home = isMgr() ? 'dashboard' : 'employee-home';
+  showPage(home);
+  await Promise.all([loadAnalytics(),loadItems(),loadLocations(),loadAlerts()]);
+  // For employees: pre-load their location's stock data
+  if(!isMgr() && state.user.location_id){
+    await Promise.all(state.items.slice(0,40).map(i=>loadItemStocks(i.id)));
+  }
+  if(isMgr()) renderDashboard();
+  else renderEmployeeHome();
+  state.alertInterval=setInterval(()=>loadAlerts().then(()=>{ if(isMgr()) renderAlerts(); }),15000);
+  setupReports();
+  setupInvColumns();
+
+  // Notification banner buttons
+  const allowBtn=$('notif-allow');
+  const denyBtn=$('notif-deny');
+  if(allowBtn) allowBtn.addEventListener('click',()=>{
+    hide('notif-banner');
+    Notification.requestPermission().then(perm=>{
+      if(perm==='granted') showToast('🔔 Notifications enabled!','success');
+    });
+  });
+  if(denyBtn) denyBtn.addEventListener('click',()=>hide('notif-banner'));
+}
+
+/* ═══════════ LOADERS ═══════════ */
+async function loadAnalytics(){ state.analytics=await A('/analytics/summary').catch(()=>null); }
+async function loadItems(){ const d=await A('/items').catch(()=>[]); state.items=Array.isArray(d)?d:[]; }
+async function loadLocations(){ const d=await A('/locations').catch(()=>[]); state.locations=Array.isArray(d)?d:[]; }
+async function loadAlerts(){
+  const d=await alertFetch('/alerts');
+  const fresh=Array.isArray(d)?d:[];
+  // detect NEW alerts (ids not seen before) → fire Chrome notification
+  fresh.forEach(a=>{
+    if(!state.prevAlertIds.has(a.id)){
+      if(state.prevAlertIds.size>0){          // skip very first load (initial set)
+        fireNotification(a);
+      }
+      state.prevAlertIds.add(a.id);
+    }
+  });
+  state.alerts=fresh;
+}
+async function loadItemStocks(id){ const d=await A('/items/'+id+'/locations').catch(()=>[]); state.stockCache[id]=Array.isArray(d)?d:[]; }
+
+/* ═══════════════════════════════════════════════
+   EMPLOYEE HOME — filtered to their location only
+═══════════════════════════════════════════════ */
+function getEmployeeItems(){
+  const locId=state.user.location_id;
+  if(!locId) return state.items;           // no location assigned → show all but read-only
+  // Filter to items that have stock at the employee's location
+  // We check state.stockCache but also fall back to items.location_id
+  return state.items.filter(i=>{
+    if(i.location_id===locId) return true;
+    const stocks=state.stockCache[i.id];
+    if(stocks) return stocks.some(s=>s.location_id===locId);
+    return true; // include all if stocks not loaded yet; will filter in table
+  });
+}
+
+function renderEmployeeHome(){
+  const u=state.user;
+  $('emp-sub').textContent=`${u.full_name} · ${u.location_name||'No location assigned'}`;
+  const myItems=getEmployeeItems();
+  const total=myItems.length;
+  const low=myItems.filter(i=>i.quantity>0&&i.quantity<i.min_quantity).length;
+  const oos=myItems.filter(i=>i.quantity===0).length;
+  $('emp-stats').innerHTML=[
+    {val:total,lbl:'Items at My Location',c:'var(--cyan)'},
+    {val:low,  lbl:'Low Stock',            c:'var(--amber)'},
+    {val:oos,  lbl:'Out of Stock',         c:'var(--red)'},
+  ].map(s=>`<div class="emp-stat"><div class="emp-stat-val" style="background:linear-gradient(135deg,${s.c},var(--blue2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">${s.val}</div><div class="emp-stat-lbl">${s.lbl}</div></div>`).join('');
+
+  $('emp-items-tbody').innerHTML=myItems.slice(0,50).map(i=>{
+    const st=i.quantity===0?'<span class="badge badge-danger">Out</span>':i.quantity<i.min_quantity?'<span class="badge badge-warning">Low</span>':'<span class="badge badge-success">OK</span>';
+    // Employee can adjust qty at their own location via stock endpoint
+    const locId=u.location_id;
+    const myStock=state.stockCache[i.id]?.find(s=>s.location_id===locId);
+    const dispQty=myStock?myStock.quantity:i.quantity;
+    const qtyCtrl=locId?`<div class="qty-ctrl">
+      <div class="qty-btn" onclick="empChangeQty(${i.id},${locId},${dispQty},-1)">−</div>
+      <span class="qty-val" id="emp-qty-${i.id}">${dispQty}</span>
+      <div class="qty-btn" onclick="empChangeQty(${i.id},${locId},${dispQty},+1)">+</div>
+    </div>`:`<span>${dispQty}</span>`;
+    return `<tr>
+      <td><b>${i.name}</b></td>
+      <td style="font-family:monospace;font-size:.75rem;color:var(--text3)">${i.sku||'—'}</td>
+      <td>${qtyCtrl}</td>
+      <td>${i.min_quantity}</td>
+      <td>${st}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function empChangeQty(itemId,locId,cur,delta){
+  const newQty=Math.max(0,cur+delta);
+  try{
+    await A('/items/'+itemId+'/locations/'+locId,jbody('PUT',{quantity:newQty}));
+    // Update stockCache
+    if(state.stockCache[itemId]){
+      const s=state.stockCache[itemId].find(s=>s.location_id===locId);
+      if(s) s.quantity=newQty;
+    }
+    await loadItems();
+    // update the qty display in employee table without full re-render
+    const el=$('emp-qty-'+itemId);
+    if(el) el.textContent=newQty;
+    // refresh full table
+    renderEmployeeHome();
+  }catch(err){alert(err.message);}
+}
+
+/* ═══════════════════════════════════════════════
+   DASHBOARD
+═══════════════════════════════════════════════ */
+function renderDashboard(){
+  const ana=state.analytics||{};
+  const stats=[
+    {lbl:'Total SKUs',     val:ana.total_items||0,            icon:'📦'},
+    {lbl:'Low Stock',      val:ana.low_stock_count||0,        icon:'⚠️'},
+    {lbl:'Out of Stock',   val:ana.out_of_stock||0,          icon:'❌'},
+    {lbl:'Active Alerts',  val:state.alerts.length,           icon:'🔔'},
+    {lbl:'Inventory Value',val:fmtMoney(ana.inventory_value||0),icon:'💰'},
+  ];
+  $('stats-grid').innerHTML=stats.map(s=>`
+    <div class="stat-card">
+      <div class="stat-lbl">${s.lbl}</div>
+      <div class="stat-val">${s.val}</div>
+      <div class="stat-icon">${s.icon}</div>
+    </div>`).join('');
+
+  // Destroy old charts
+  ['line','donut','itemsPie'].forEach(k=>{ if(state.charts[k]){state.charts[k].destroy();state.charts[k]=null;} });
+
+  const base=ana.total_items||20;
+  state.charts.line=new Chart($('chart-line'),{
+    type:'line',
+    data:{labels:['6d ago','5d ago','4d ago','3d ago','2d ago','Yesterday','Today'],
+      datasets:[{label:'SKUs',fill:true,tension:.4,
+        data:[base-12,base-8,base-5,base,base+2,base+5,base],
+        borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,.1)'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{y:{beginAtZero:false,grid:{color:'rgba(71,85,105,.18)'},ticks:{color:'#94a3b8'}},
+              x:{grid:{display:false},ticks:{color:'#94a3b8'}}}}
+  });
+
+  const cats=ana.categories||[];
+  if(cats.length){
+    state.charts.donut=new Chart($('chart-donut'),{
+      type:'doughnut',
+      data:{labels:cats.map(c=>c.category||'Other'),datasets:[{data:cats.map(c=>c.count),backgroundColor:['#3b82f6','#22d3ee','#34d399','#fbbf24','#f87171','#a78bfa','#f472b6']}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#cbd5e1',padding:9,font:{size:11}}}}}
+    });
+  }
+
+  renderItemsBreakdown();
+  renderAlerts();
+}
+
+/* NEW: Pie chart of all items by quantity + horizontal bar breakdown */
+function renderItemsBreakdown(){
+  if(!state.items.length) return;
+
+  // top 12 items for clarity
+  const sorted=[...state.items].sort((a,b)=>b.quantity-a.quantity).slice(0,12);
+  const COLORS=['#3b82f6','#22d3ee','#34d399','#fbbf24','#f87171','#a78bfa','#f472b6','#fb923c','#4ade80','#38bdf8','#c084fc','#e879f9'];
+
+  if(state.charts.itemsPie){state.charts.itemsPie.destroy();state.charts.itemsPie=null;}
+
+  const canvas=$('chart-items-pie');
+  if(canvas){
+    state.charts.itemsPie=new Chart(canvas,{
+      type:'pie',
+      data:{
+        labels:sorted.map(i=>i.name+(i.quantity===0?' (0)':'')),
+        datasets:[{data:sorted.map(i=>Math.max(i.quantity,0.1)),backgroundColor:COLORS}]
+      },
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{
+          legend:{position:'bottom',labels:{color:'#cbd5e1',padding:8,font:{size:10},boxWidth:12}},
+          tooltip:{callbacks:{label:ctx=>{
+            const item=sorted[ctx.dataIndex];
+            return ` ${item.name}: ${item.quantity} units`;
+          }}}
+        }
+      }
+    });
+  }
+
+  // Horizontal bar breakdown
+  const maxQty=Math.max(...sorted.map(i=>i.quantity),1);
+  $('prod-breakdown').innerHTML=sorted.map((item,idx)=>{
+    const pct=Math.max((item.quantity/maxQty)*100,1);
+    const col=COLORS[idx%COLORS.length];
+    const isLow=item.quantity>0&&item.quantity<item.min_quantity;
+    const isOos=item.quantity===0;
+    return `<div class="prod-bar-row">
+      <div class="prod-bar-name" title="${item.name}">${item.name}</div>
+      <div class="prod-bar-track">
+        <div class="prod-bar-fill" style="width:${pct}%;background:${isOos?'var(--red)':isLow?'var(--amber)':col}"></div>
+      </div>
+      <div class="prod-bar-val" style="color:${isOos?'var(--red)':isLow?'var(--amber)':col}">${item.quantity}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ═══════════ ALERTS ═══════════ */
+function renderAlerts(){
+  const sec=$('alerts-section');
+  const total=state.alerts.length;
+  const crit=state.alerts.filter(a=>a.alert_type==='out_of_stock').length;
+  const warn=state.alerts.filter(a=>a.alert_type!=='out_of_stock').length;
+
+  // Compute "above average" — items whose qty is above mean are healthy
+  const qtys=state.items.map(i=>i.quantity);
+  const avg=qtys.length?(qtys.reduce((a,b)=>a+b,0)/qtys.length):0;
+  const aboveAvg=state.items.filter(i=>i.quantity>avg).length;
+  const belowAvg=state.items.filter(i=>i.quantity<=avg&&i.quantity>0).length;
+  const oos=state.items.filter(i=>i.quantity===0).length;
+  const totalItems=state.items.length||1;
+
+  if(!total&&!state.items.length){ sec.innerHTML=''; return; }
+
+  sec.innerHTML=`
+  <div style="margin-bottom:1.25rem">
+    <div class="fw7" style="font-size:1.05rem;margin-bottom:1rem">🔔 Alert Summary</div>
+
+    <!-- Count cards -->
+    <div class="alert-summary-grid">
+      <div class="alert-count-card">
+        <div class="alert-count-num" style="color:var(--red)">${crit}</div>
+        <div class="alert-count-lbl">Out of Stock</div>
+        <div class="alert-bar"><div class="alert-bar-fill" style="width:${(crit/totalItems*100).toFixed(1)}%;background:var(--red)"></div></div>
+      </div>
+      <div class="alert-count-card">
+        <div class="alert-count-num" style="color:var(--amber)">${warn}</div>
+        <div class="alert-count-lbl">Low Stock</div>
+        <div class="alert-bar"><div class="alert-bar-fill" style="width:${(warn/totalItems*100).toFixed(1)}%;background:var(--amber)"></div></div>
+      </div>
+      <div class="alert-count-card">
+        <div class="alert-count-num" style="color:var(--green)">${aboveAvg}</div>
+        <div class="alert-count-lbl">Above Average</div>
+        <div class="alert-bar"><div class="alert-bar-fill" style="width:${(aboveAvg/totalItems*100).toFixed(1)}%;background:var(--green)"></div></div>
+      </div>
+      <div class="alert-count-card">
+        <div class="alert-count-num" style="color:var(--blue2)">${belowAvg}</div>
+        <div class="alert-count-lbl">Below Average</div>
+        <div class="alert-bar"><div class="alert-bar-fill" style="width:${(belowAvg/totalItems*100).toFixed(1)}%;background:var(--blue2)"></div></div>
+      </div>
+    </div>
+
+    <!-- Average label -->
+    <div style="text-align:center;font-size:.78rem;color:var(--text3);margin:.75rem 0">
+      Average stock level: <span style="color:var(--cyan);font-weight:700">${avg.toFixed(1)} units/SKU</span>
+      &nbsp;·&nbsp; ${totalItems} total SKUs tracked
+    </div>
+
+    <!-- Alert list -->
+    ${total>0?`<div class="fw6" style="margin-bottom:.65rem;color:var(--amber)">⚠️ Active Alerts (${total})</div>`:''}
+    ${state.alerts.map(a=>`
+      <div class="alert-item${a.alert_type==='out_of_stock'?' crit':''}">
+        <span style="font-size:1.2rem">${a.alert_type==='out_of_stock'?'❌':'⚠️'}</span>
+        <div style="flex:1;min-width:0">
+          <div class="fw6">${a.item_name||a.message||'Alert'}</div>
+          <div class="text-sm text-muted">
+            ${a.quantity!=null?`Qty: <b style="color:${a.alert_type==='out_of_stock'?'var(--red)':'var(--amber)'}">${a.quantity}</b> | Min required: ${a.min_quantity}`:''}
+            ${a.category?' | '+a.category:''}
+          </div>
+        </div>
+        <button class="alert-resolve" onclick="resolveAlert(${a.id})">✓ Resolve</button>
+      </div>`).join('')}
+    ${total===0?'<div style="text-align:center;padding:.75rem;color:var(--green);font-weight:600">✅ No active alerts</div>':''}
+  </div>`;
+}
+
+/* ─────────────────────────────────────────────
+   RESOLVE ALERT — modal with qty + location
+───────────────────────────────────────────── */
+function resolveAlert(alertId){
+  const alert=state.alerts.find(a=>a.id===alertId);
+  if(!alert) return;
+
+  const locOpts=state.locations.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
+  const alertColor=alert.alert_type==='out_of_stock'?'var(--red)':'var(--amber)';
+  const currentQty=alert.quantity??0;
+  const minQty=alert.min_quantity??0;
+  const needed=Math.max(minQty-currentQty,1);
+
+  $('resolve-title').textContent=(alert.alert_type==='out_of_stock'?'❌':'⚠️')+' Resolve: '+(alert.item_name||'Item');
+  $('resolve-sub').textContent=`Current: ${currentQty} units · Min required: ${minQty} · Needs at least ${needed} more`;
+
+  $('resolve-body').innerHTML=`
+    <div style="background:rgba(30,41,59,.55);border-radius:10px;padding:1rem;margin-bottom:1.25rem;border-left:3px solid ${alertColor}">
+      <div class="flex justify-between" style="margin-bottom:.4rem">
+        <span class="text-sm fw6" style="color:${alertColor}">${alert.alert_type==='out_of_stock'?'Out of Stock':'Low Stock'}</span>
+        ${alert.category?`<span class="badge badge-info">${alert.category}</span>`:''}
+      </div>
+      <div class="text-sm text-muted">Adding stock will update the item's total and re-check whether this alert should remain active.</div>
+    </div>
+
+    <div class="fg">
+      <label class="lbl">Warehouse / Location to restock *</label>
+      <select class="inp" id="res-loc">
+        <option value="">— select warehouse —</option>
+        ${locOpts}
+      </select>
+    </div>
+    <div class="fg">
+      <label class="lbl">Quantity to Add *</label>
+      <input class="inp" type="number" id="res-qty" min="1" value="${needed}" placeholder="e.g. ${needed}">
+    </div>
+
+    <!-- Live preview -->
+    <div id="res-preview" style="background:rgba(30,41,59,.5);border-radius:9px;padding:.875rem;margin-bottom:1.25rem;font-size:.82rem">
+      <div class="flex justify-between">
+        <span class="text-muted">Current total</span>
+        <span class="fw6">${currentQty} units</span>
+      </div>
+      <div class="flex justify-between mt1">
+        <span class="text-muted">After restock</span>
+        <span class="fw6" id="res-new-qty" style="color:var(--cyan)">${currentQty+needed} units</span>
+      </div>
+      <div class="flex justify-between mt1">
+        <span class="text-muted">Min required</span>
+        <span class="fw6">${minQty} units</span>
+      </div>
+      <div id="res-status" style="margin-top:.75rem;padding:.5rem .75rem;border-radius:6px;font-size:.78rem;font-weight:700;text-align:center;background:rgba(52,211,153,.14);color:var(--green)">
+        ✅ This will resolve the alert
+      </div>
+    </div>
+
+    <div class="flex gap2">
+      <button class="btn btn-primary" id="res-submit">Restock & Resolve</button>
+      <button class="btn btn-secondary" onclick="hide('modal-resolve')">Cancel</button>
+    </div>`;
+
+  // Live qty preview
+  const qtyInput=$('res-qty');
+  qtyInput.addEventListener('input',()=>{
+    const adding=parseInt(qtyInput.value)||0;
+    const newTotal=currentQty+adding;
+    const el=$('res-new-qty');
+    const st=$('res-status');
+    if(el) el.textContent=newTotal+' units';
+    if(st){
+      if(newTotal>=minQty){
+        st.style.background='rgba(52,211,153,.14)'; st.style.color='var(--green)';
+        st.textContent='✅ This will resolve the alert';
+      } else {
+        st.style.background='rgba(251,191,36,.14)'; st.style.color='var(--amber)';
+        st.textContent='⚠️ Still below minimum — alert may remain active';
+      }
+    }
+  });
+
+  $('res-submit').onclick=async()=>{
+    const locId=parseInt($('res-loc').value);
+    const qty=parseInt($('res-qty').value)||0;
+    if(!locId){alert('Please select a warehouse');return;}
+    if(qty<=0){alert('Quantity must be at least 1');return;}
+    const btn=$('res-submit');
+    btn.disabled=true; btn.textContent='Restocking…';
+    try{
+      // 1. Add stock to the selected location
+      const stocks=state.stockCache[alert.item_id]||(await A('/items/'+alert.item_id+'/locations').catch(()=>[]));
+      const existingLoc=Array.isArray(stocks)?stocks.find(s=>s.location_id===locId):null;
+      if(existingLoc){
+        // Update existing location stock
+        await A('/items/'+alert.item_id+'/locations/'+locId, jbody('PUT',{quantity:existingLoc.quantity+qty}));
+      } else {
+        // Add item to this location
+        await A('/items/'+alert.item_id+'/locations', jbody('POST',{location_id:locId,quantity:qty}));
+      }
+
+      // 2. Reload items to get updated totals
+      await loadItems();
+      await loadItemStocks(alert.item_id);
+
+      // 3. Reload alerts — backend checks if alert should still be active
+      const prevCount=state.alerts.length;
+      await loadAlerts();
+
+      hide('modal-resolve');
+
+      // 4. Refresh dashboard
+      if(isMgr()) renderAlerts();
+      const statCard=document.querySelectorAll('.stat-card')[3];
+      if(statCard) statCard.querySelector('.stat-val').textContent=state.alerts.length;
+      if(document.getElementById('page-inventory')&&!document.getElementById('page-inventory').classList.contains('hidden')){
+        renderInventory();
+      }
+
+      // 5. Show result toast
+      const newCount=state.alerts.length;
+      const wasResolved=newCount<prevCount;
+      showToast(wasResolved
+        ? `✅ Stock added to location. Alert resolved.`
+        : `📦 Stock added. Alert still active (qty still below minimum).`,
+        wasResolved?'success':'warning');
+
+    }catch(err){alert('Error: '+err.message);}
+    finally{btn.disabled=false; btn.textContent='Restock & Resolve';}
+  };
+
+  show('modal-resolve');
+}
+
+/* ─── Toast notification ─── */
+function showToast(msg, type='success'){
+  const colors={success:'var(--green)',warning:'var(--amber)',error:'var(--red)'};
+  const t=document.createElement('div');
+  t.style.cssText=`position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:rgba(10,14,30,.97);border:1px solid ${colors[type]};border-radius:10px;padding:.875rem 1.5rem;color:${colors[type]};font-weight:700;font-size:.875rem;z-index:3000;box-shadow:0 8px 30px rgba(0,0,0,.5);transition:opacity .4s;pointer-events:none`;
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>{ t.style.opacity='0'; setTimeout(()=>t.remove(),450); },3200);
+}
+
+/* ═══════════ PAGE DISPATCH ═══════════ */
+async function loadPage(pg){
+  switch(pg){
+    case 'dashboard':     await Promise.all([loadAnalytics(),loadItems(),loadAlerts()]); renderDashboard(); break;
+    case 'employee-home':
+      await loadItems();
+      // Pre-load stocks for employee's location so qty display is accurate
+      if(state.user.location_id){
+        await Promise.all(state.items.slice(0,40).map(i=>loadItemStocks(i.id)));
+      }
+      renderEmployeeHome();
+      break;
+    case 'inventory':     await loadItems(); renderInventory(); break;
+    case 'locations':     await loadLocations(); renderLocations(); break;
+    case 'contacts':      renderContacts(); break;
+    case 'users':         renderUsers(); break;
+    case 'settings':      renderSettings(); break;
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   COLUMN VISIBILITY (slider tags)
+═══════════════════════════════════════════════ */
+const INV_COLS=[
+  {key:'expand',label:'▶',always:true},
+  {key:'name',  label:'Name',always:true},
+  {key:'sku',   label:'SKU'},
+  {key:'qty',   label:'Qty',always:true},
+  {key:'min',   label:'Min'},
+  {key:'price', label:'Price'},
+  {key:'cat',   label:'Category'},
+  {key:'status',label:'Status',always:true},
+  {key:'actions',label:'Actions',always:true},
+];
+
+function setupInvColumns(){
+  const wrap=$('col-tags');
+  if(!wrap) return;
+  wrap.innerHTML=INV_COLS.filter(c=>!c.always).map(c=>`
+    <div class="col-tag${state.hiddenCols.has(c.key)?' hidden-col':''}" data-col="${c.key}" title="Toggle ${c.label}">
+      ${state.hiddenCols.has(c.key)?'○':'●'} ${c.label}
+    </div>`).join('');
+  wrap.querySelectorAll('.col-tag').forEach(tag=>{
+    tag.addEventListener('click',()=>{
+      const k=tag.dataset.col;
+      if(state.hiddenCols.has(k)) state.hiddenCols.delete(k);
+      else state.hiddenCols.add(k);
+      tag.classList.toggle('hidden-col');
+      tag.textContent=(state.hiddenCols.has(k)?'○':'●')+' '+INV_COLS.find(c=>c.key===k).label;
+      renderInventory();
+    });
+  });
+}
+
+/* ═══════════════════════════════════════════════
+   INVENTORY
+═══════════════════════════════════════════════ */
+function renderInventory(){
+  const search=($('inv-search')||{value:''}).value.toLowerCase();
+  const items=state.items.filter(i=>
+    (i.name||'').toLowerCase().includes(search)||
+    (i.sku||'').toLowerCase().includes(search)||
+    (i.category||'').toLowerCase().includes(search)
+  );
+  const cnt=$('inv-count'); if(cnt) cnt.textContent='('+items.length+')';
+
+  const hid=state.hiddenCols;
+  const showCol=k=>!hid.has(k);
+
+  // Build thead
+  const ths=[
+    '<th style="width:32px"></th>',
+    '<th>Name</th>',
+    showCol('sku')?'<th>SKU</th>':'',
+    '<th>Total Qty</th>',
+    showCol('min')?'<th>Min</th>':'',
+    showCol('price')?'<th>Price</th>':'',
+    showCol('cat')?'<th>Category</th>':'',
+    '<th>Status</th>',
+    '<th>Actions</th>',
+  ];
+  $('inv-thead').innerHTML='<tr>'+ths.join('')+'</tr>';
+
+  const tbody=$('inv-tbody');
+  if(!items.length){ tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--text3)">No items found</td></tr>'; return; }
+
+  let html='';
+  const colspan=9-hid.size;
+  for(const item of items){
+    const st=item.quantity===0?'<span class="badge badge-danger">Out of Stock</span>':
+      item.quantity<item.min_quantity?'<span class="badge badge-warning">Low Stock</span>':
+      '<span class="badge badge-success">In Stock</span>';
+    const isExp=state.expanded===item.id;
+    html+=`<tr class="${isExp?'tr-expanded':''}">
+      <td><button class="expand-btn${isExp?' open':''}" onclick="toggleExpand(${item.id})">▶</button></td>
+      <td><b>${item.name}</b></td>
+      ${showCol('sku')?`<td style="font-family:monospace;font-size:.75rem;color:var(--text3)">${item.sku||'—'}</td>`:''}
+      <td><div class="qty-ctrl">
+        <div class="qty-btn" onclick="changeItemQty(${item.id},${item.quantity},-1)">−</div>
+        <span class="qty-val">${item.quantity}</span>
+        <div class="qty-btn" onclick="changeItemQty(${item.id},${item.quantity},+1)">+</div>
+      </div></td>
+      ${showCol('min')?`<td>${item.min_quantity}</td>`:''}
+      ${showCol('price')?`<td>${fmtMoney(item.price)}</td>`:''}
+      ${showCol('cat')?`<td>${item.category||'—'}</td>`:''}
+      <td>${st}</td>
+      <td><div class="flex gap1">
+        <button class="btn btn-amber btn-sm" onclick="openEditItem(${item.id})">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteItem(${item.id})">🗑️</button>
+      </div></td>
+    </tr>`;
+
+    if(isExp){
+      html+=`<tr class="tr-sub"><td></td><td colspan="${colspan-1}" style="padding-left:2rem;color:var(--cyan);font-weight:700;font-size:.7rem;text-transform:uppercase;letter-spacing:.06em">📍 Warehouse Distribution</td></tr>`;
+      const stocks=state.stockCache[item.id]||[];
+      const empLocId=state.user.role==='employee'?state.user.location_id:null;
+      // Employees see only their location's stock row
+      const visibleStocks=empLocId ? stocks.filter(s=>s.location_id===empLocId) : stocks;
+
+      if(!visibleStocks.length) html+=`<tr class="tr-sub"><td></td><td colspan="${colspan-1}" style="padding-left:2.5rem;color:var(--text3);font-style:italic">${empLocId?'Not stocked at your location':'No warehouse assignments yet'}</td></tr>`;
+      for(const s of visibleStocks){
+        html+=`<tr class="tr-sub">
+          <td></td><td colspan="2" style="padding-left:2.5rem"><span class="loc-badge">📍 ${s.location_name||'Location #'+s.location_id}</span></td>
+          <td><div class="qty-ctrl">
+            <div class="qty-btn" onclick="changeLocQty(${item.id},${s.location_id},${s.quantity},-1)">−</div>
+            <span class="qty-val">${s.quantity}</span>
+            <div class="qty-btn" onclick="changeLocQty(${item.id},${s.location_id},${s.quantity},+1)">+</div>
+          </div></td>
+          <td colspan="${colspan-4}"></td>
+          <td>${!empLocId?`<button class="btn btn-danger btn-sm" onclick="removeLocStock(${item.id},${s.location_id})">Remove</button>`:''}</td>
+        </tr>`;
+      }
+      // Only managers/admins can add to new locations
+      if(!empLocId){
+        const used=stocks.map(s=>s.location_id);
+        const avail=state.locations.filter(l=>!used.includes(l.id));
+        if(avail.length){
+          const opts=avail.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
+          html+=`<tr class="tr-sub"><td></td><td colspan="${colspan-1}" style="padding-left:2.5rem">
+            <div class="flex gap1 items-center flex-wrap" style="padding:.4rem 0">
+              <span class="text-xs text-muted">Add to:</span>
+              <select class="inp" id="add-loc-sel-${item.id}" style="width:auto;padding:.3rem .65rem;font-size:.78rem"><option value="">— select —</option>${opts}</select>
+              <input type="number" class="inp" id="add-loc-qty-${item.id}" placeholder="Qty" style="width:70px;padding:.3rem .55rem;font-size:.78rem" value="0" min="0">
+              <button class="btn btn-success btn-sm" onclick="addToLoc(${item.id})">＋ Add</button>
+            </div></td></tr>`;
+        } else {
+          html+=`<tr class="tr-sub"><td></td><td colspan="${colspan-1}" style="padding-left:2.5rem;color:var(--text3);font-style:italic;font-size:.75rem">✓ All locations assigned</td></tr>`;
+        }
+      }
+    }
+  }
+  tbody.innerHTML=html;
+}
+
+/* Add item form */
+$('btn-add-item').addEventListener('click',()=>{
+  const f=$('add-item-form');
+  const locOpts=state.locations.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
+  f.innerHTML=`<div class="card-header"><div class="card-title">➕ New Item</div></div>
+  <div class="card-body"><div class="fgrid">
+    <div class="fg"><label class="lbl">Name *</label><input class="inp" id="ni-name"></div>
+    <div class="fg"><label class="lbl">SKU</label><input class="inp" id="ni-sku"></div>
+    <div class="fg"><label class="lbl">Initial Qty</label><input class="inp" type="number" id="ni-qty" value="0"></div>
+    <div class="fg"><label class="lbl">Min Qty *</label><input class="inp" type="number" id="ni-min" value="10"></div>
+    <div class="fg"><label class="lbl">Price</label><input class="inp" type="number" step="0.01" id="ni-price" value="0"></div>
+    <div class="fg"><label class="lbl">Category</label><input class="inp" id="ni-cat"></div>
+    <div class="fg"><label class="lbl">Initial Location</label><select class="inp" id="ni-loc"><option value="">None</option>${locOpts}</select></div>
+  </div>
+  <div class="flex gap2"><button class="btn btn-primary" id="ni-submit">Add Item</button><button class="btn btn-secondary" id="ni-cancel">Cancel</button></div></div>`;
+  show('add-item-form');
+  $('ni-cancel').onclick=()=>hide('add-item-form');
+  $('ni-submit').onclick=async()=>{
+    const body={name:$('ni-name').value,sku:$('ni-sku').value,quantity:+$('ni-qty').value,min_quantity:+$('ni-min').value,price:+$('ni-price').value,category:$('ni-cat').value};
+    if($('ni-loc').value) body.location_id=+$('ni-loc').value;
+    try{await A('/items',jbody('POST',body));hide('add-item-form');await loadItems();renderInventory();}
+    catch(err){alert(err.message);}
+  };
+});
+$('inv-search').addEventListener('input',()=>renderInventory());
+
+async function toggleExpand(id){
+  if(state.expanded===id){state.expanded=null;renderInventory();return;}
+  state.expanded=id;
+  if(!state.stockCache[id]) await loadItemStocks(id);
+  renderInventory();
+}
+async function changeItemQty(id,cur,delta){
+  try{await A('/items/'+id,jbody('PUT',{quantity:Math.max(0,cur+delta)}));await loadItems();renderInventory();}
+  catch(err){alert(err.message);}
+}
+async function changeLocQty(itemId,locId,cur,delta){
+  try{await A('/items/'+itemId+'/locations/'+locId,jbody('PUT',{quantity:Math.max(0,cur+delta)}));await loadItemStocks(itemId);await loadItems();renderInventory();}
+  catch(err){alert(err.message);}
+}
+async function removeLocStock(itemId,locId){
+  if(!confirm('Remove from this location?'))return;
+  try{await A('/items/'+itemId+'/locations/'+locId,{method:'DELETE'});await loadItemStocks(itemId);await loadItems();renderInventory();}
+  catch(err){alert(err.message);}
+}
+async function addToLoc(itemId){
+  const locId=+$('add-loc-sel-'+itemId).value, qty=+$('add-loc-qty-'+itemId).value||0;
+  if(!locId){alert('Select a warehouse');return;}
+  try{await A('/items/'+itemId+'/locations',jbody('POST',{location_id:locId,quantity:qty}));await loadItemStocks(itemId);await loadItems();renderInventory();}
+  catch(err){alert(err.message);}
+}
+async function deleteItem(id){
+  if(!confirm('Delete this item?'))return;
+  try{await A('/items/'+id,{method:'DELETE'});if(state.expanded===id)state.expanded=null;delete state.stockCache[id];await loadItems();renderInventory();}
+  catch(err){alert(err.message);}
+}
+async function openEditItem(id){
+  const item=state.items.find(i=>i.id===id); if(!item)return;
+  if(!state.stockCache[id]) await loadItemStocks(id);
+  const stocks=state.stockCache[id]||[];
+  $('edit-item-title').textContent='✏️ Edit: '+item.name;
+  $('edit-item-body').innerHTML=`<div class="fgrid">
+    <div class="fg"><label class="lbl">Name *</label><input class="inp" id="ei-name" value="${item.name||''}"></div>
+    <div class="fg"><label class="lbl">SKU</label><input class="inp" id="ei-sku" value="${item.sku||''}"></div>
+    <div class="fg"><label class="lbl">Min Qty</label><input class="inp" type="number" id="ei-min" value="${item.min_quantity||0}"></div>
+    <div class="fg"><label class="lbl">Price</label><input class="inp" type="number" step="0.01" id="ei-price" value="${item.price||0}"></div>
+    <div class="fg"><label class="lbl">Category</label><input class="inp" id="ei-cat" value="${item.category||''}"></div>
+  </div>
+  ${stocks.length?`<div class="lbl" style="margin:1rem 0 .65rem">Warehouse Quantities</div>
+  ${stocks.map(s=>`<div class="flex gap2 items-center" style="padding:.65rem .75rem;background:rgba(30,41,59,.5);border-radius:8px;margin-bottom:.4rem">
+    <span style="flex:1;color:var(--cyan2);font-weight:600;font-size:.835rem">📍 ${s.location_name}</span>
+    <div class="qty-ctrl">
+      <div class="qty-btn" onclick="changeLocQty(${id},${s.location_id},${s.quantity},-1);refreshEditModal(${id})">−</div>
+      <span class="qty-val" id="es-qty-${s.location_id}">${s.quantity}</span>
+      <div class="qty-btn" onclick="changeLocQty(${id},${s.location_id},${s.quantity},+1);refreshEditModal(${id})">+</div>
+    </div>
+  </div>`).join('')}`:''}
+  <div class="flex gap2" style="margin-top:1rem">
+    <button class="btn btn-primary" onclick="saveEditItem(${id})">Save Changes</button>
+    <button class="btn btn-secondary" onclick="hide('modal-edit-item')">Cancel</button>
+  </div>`;
+  show('modal-edit-item');
+}
+async function refreshEditModal(id){
+  await loadItemStocks(id); await loadItems();
+  (state.stockCache[id]||[]).forEach(s=>{const el=$('es-qty-'+s.location_id);if(el)el.textContent=s.quantity;});
+  renderInventory();
+}
+async function saveEditItem(id){
+  try{await A('/items/'+id,jbody('PUT',{name:$('ei-name').value,sku:$('ei-sku').value,min_quantity:+$('ei-min').value,price:+$('ei-price').value,category:$('ei-cat').value}));
+    hide('modal-edit-item');await loadItems();renderInventory();}
+  catch(err){alert(err.message);}
+}
+
+/* ═══════════════════════════════════════════════
+   LOCATIONS (with Edit + Delete)
+═══════════════════════════════════════════════ */
+function renderLocations(){
+  $('loc-tbody').innerHTML=state.locations.map(l=>`
+    <tr>
+      <td>${l.id}</td><td><b>${l.name}</b></td><td>${l.address||'—'}</td><td>${fmtDate(l.created_at)}</td>
+      <td><div class="flex gap1">
+        <button class="btn btn-amber btn-sm" onclick="openEditLoc(${l.id},'${(l.name||'').replace(/'/g,"\\'")}','${(l.address||'').replace(/'/g,"\\'")}')">✏️ Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteLoc(${l.id},'${(l.name||'').replace(/'/g,"\\'")}')">🗑️</button>
+      </div></td>
+    </tr>`).join('');
+}
+
+$('btn-add-loc').addEventListener('click',()=>{
+  const f=$('add-loc-form');
+  f.innerHTML=`<div class="card-header"><div class="card-title">New Location</div></div>
+  <div class="card-body"><div class="fgrid">
+    <div class="fg"><label class="lbl">Name *</label><input class="inp" id="nl-name"></div>
+    <div class="fg"><label class="lbl">Address</label><input class="inp" id="nl-addr"></div>
+  </div>
+  <div class="flex gap2"><button class="btn btn-primary" id="nl-submit">Add</button><button class="btn btn-secondary" id="nl-cancel">Cancel</button></div></div>`;
+  show('add-loc-form');
+  $('nl-cancel').onclick=()=>hide('add-loc-form');
+  $('nl-submit').onclick=async()=>{
+    try{await A('/locations',jbody('POST',{name:$('nl-name').value,address:$('nl-addr').value}));hide('add-loc-form');await loadLocations();renderLocations();}
+    catch(err){alert(err.message);}
+  };
+});
+
+function openEditLoc(id, name, address){
+  $('edit-loc-body').innerHTML=`
+    <div class="fg"><label class="lbl">Name *</label><input class="inp" id="el-name" value="${name}"></div>
+    <div class="fg"><label class="lbl">Address</label><input class="inp" id="el-addr" value="${address}"></div>
+    <div class="flex gap2" style="margin-top:.5rem">
+      <button class="btn btn-primary" onclick="saveEditLoc(${id})">Save</button>
+      <button class="btn btn-secondary" onclick="hide('modal-edit-loc')">Cancel</button>
+    </div>`;
+  show('modal-edit-loc');
+}
+async function saveEditLoc(id){
+  try{await A('/locations/'+id,jbody('PUT',{name:$('el-name').value,address:$('el-addr').value}));
+    hide('modal-edit-loc');await loadLocations();renderLocations();}
+  catch(err){alert(err.message);}
+}
+async function deleteLoc(id,name){
+  if(!confirm('Delete location "'+name+'"? Items assigned here may be affected.'))return;
+  try{await A('/locations/'+id,{method:'DELETE'});await loadLocations();renderLocations();}
+  catch(err){alert(err.message);}
+}
+
+/* ═══════════ CONTACTS ═══════════ */
+async function renderContacts(){
+  const data=await A('/contacts').catch(()=>[]);
+  const rows=(Array.isArray(data)?data:[]).map(c=>`
+    <tr><td><b>${c.full_name}</b></td><td class="text-sm">${c.email||'—'}</td>
+    <td style="color:var(--cyan);font-weight:600">${c.phone||'—'}</td>
+    <td><span class="badge ${c.role==='admin'?'badge-danger':c.role==='manager'?'badge-info':'badge-success'}">${c.role}</span></td>
+    <td>${c.location_name||'—'}</td></tr>`).join('');
+  $('contacts-tbody').innerHTML=rows||'<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--text3)">No contacts</td></tr>';
+}
+
+/* ═══════════════════════════════════════════════
+   USERS — Admin: full edit/delete | Manager: view only
+═══════════════════════════════════════════════ */
+async function renderUsers(){
+  const data=await A('/users').catch(()=>[]);
+  const users=Array.isArray(data)?data:[];
+  const admin=isAdmin();
+
+  $('users-sub').textContent=admin?'Full access — edit and delete users':'Read-only — contact an admin to make changes';
+  $('users-act-th').textContent=admin?'Actions':'';
+
+  // Add user button — admin only
+  if(admin) show('users-add-wrap'); else hide('users-add-wrap');
+
+  $('users-tbody').innerHTML=users.map(u=>`
+    <tr>
+      <td style="font-family:monospace;font-size:.78rem">${u.username}</td>
+      <td><b>${u.full_name}</b></td>
+      <td class="text-sm">${u.email||'—'}</td>
+      <td style="color:var(--cyan);font-weight:600">${u.phone||'—'}</td>
+      <td><span class="badge ${u.role==='admin'?'badge-danger':u.role==='manager'?'badge-info':'badge-success'}">${u.role}</span></td>
+      <td>${u.location_name||'—'}</td>
+      <td class="text-sm">${fmtDate(u.last_login)}</td>
+      <td>${admin?`<div class="flex gap1">
+        <button class="btn btn-amber btn-sm" onclick="openEditUser(${u.id})">✏️</button>
+        ${u.id!==state.user.id?`<button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id},'${(u.username||'').replace(/'/g,"\\'")}')">🗑️</button>`:'<span class="text-xs text-muted">(you)</span>'}
+      </div>`:''}</td>
+    </tr>`).join('');
+}
+
+$('btn-add-user').addEventListener('click',()=>{
+  const f=$('add-user-form');
+  const locOpts=state.locations.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
+  f.innerHTML=`<div class="card-header"><div class="card-title">Create User</div></div>
+  <div class="card-body"><div class="fgrid">
+    <div class="fg"><label class="lbl">Username *</label><input class="inp" id="nu-uname"></div>
+    <div class="fg"><label class="lbl">Password *</label><input class="inp" type="password" id="nu-pass"></div>
+    <div class="fg"><label class="lbl">Full Name *</label><input class="inp" id="nu-fname"></div>
+    <div class="fg"><label class="lbl">Email</label><input class="inp" type="email" id="nu-email"></div>
+    <div class="fg"><label class="lbl">Phone</label><input class="inp" type="tel" id="nu-phone"></div>
+    <div class="fg"><label class="lbl">Role</label><select class="inp" id="nu-role"><option value="employee">Employee</option><option value="manager">Manager</option><option value="admin">Admin</option></select></div>
+    <div class="fg"><label class="lbl">Location</label><select class="inp" id="nu-loc"><option value="">None</option>${locOpts}</select></div>
+  </div>
+  <div class="flex gap2"><button class="btn btn-primary" id="nu-submit">Create</button><button class="btn btn-secondary" id="nu-cancel">Cancel</button></div></div>`;
+  show('add-user-form');
+  $('nu-cancel').onclick=()=>hide('add-user-form');
+  $('nu-submit').onclick=async()=>{
+    const body={username:$('nu-uname').value,password:$('nu-pass').value,full_name:$('nu-fname').value,email:$('nu-email').value,phone:$('nu-phone').value,role:$('nu-role').value};
+    if($('nu-loc').value) body.location_id=+$('nu-loc').value;
+    try{await A('/users',jbody('POST',body));hide('add-user-form');renderUsers();}
+    catch(err){alert(err.message);}
+  };
+});
+
+async function openEditUser(id){
+  if(!isAdmin()) return;
+  const data=await A('/users').catch(()=>[]);
+  const u=(Array.isArray(data)?data:[]).find(x=>x.id===id); if(!u) return;
+  const locOpts=state.locations.map(l=>`<option value="${l.id}"${l.id===u.location_id?' selected':''}>${l.name}</option>`).join('');
+  $('edit-user-body').innerHTML=`<div class="fgrid">
+    <div class="fg"><label class="lbl">Full Name *</label><input class="inp" id="eu-fname" value="${u.full_name||''}"></div>
+    <div class="fg"><label class="lbl">Email</label><input class="inp" type="email" id="eu-email" value="${u.email||''}"></div>
+    <div class="fg"><label class="lbl">Phone</label><input class="inp" type="tel" id="eu-phone" value="${u.phone||''}"></div>
+    <div class="fg"><label class="lbl">Role</label><select class="inp" id="eu-role"><option value="employee"${u.role==='employee'?' selected':''}>Employee</option><option value="manager"${u.role==='manager'?' selected':''}>Manager</option><option value="admin"${u.role==='admin'?' selected':''}>Admin</option></select></div>
+    <div class="fg"><label class="lbl">Location</label><select class="inp" id="eu-loc"><option value="">None</option>${locOpts}</select></div>
+    <div class="fg"><label class="lbl">New Password</label><input class="inp" type="password" id="eu-pass" placeholder="Leave blank to keep"></div>
+    <div class="fg"><label class="lbl">Confirm</label><input class="inp" type="password" id="eu-conf"></div>
+  </div>
+  <div class="flex gap2" style="margin-top:1rem">
+    <button class="btn btn-primary" onclick="saveEditUser(${id})">Save</button>
+    <button class="btn btn-secondary" onclick="hide('modal-edit-user')">Cancel</button>
+  </div>`;
+  show('modal-edit-user');
+}
+async function saveEditUser(id){
+  const pass=$('eu-pass').value, conf=$('eu-conf').value;
+  if(pass&&pass!==conf){alert('Passwords do not match');return;}
+  const body={full_name:$('eu-fname').value,email:$('eu-email').value,phone:$('eu-phone').value,role:$('eu-role').value};
+  body.location_id=$('eu-loc').value?+$('eu-loc').value:null;
+  if(pass) body.password=pass;
+  try{await A('/users/'+id,jbody('PUT',body));hide('modal-edit-user');renderUsers();}
+  catch(err){alert(err.message);}
+}
+async function deleteUser(id,uname){
+  if(!isAdmin())return;
+  if(!confirm('Delete user "'+uname+'"?'))return;
+  try{await A('/users/'+id,{method:'DELETE'});renderUsers();}
+  catch(err){alert(err.message);}
+}
+
+/* ═══════════════════════════════════════════════
+   REPORTS
+═══════════════════════════════════════════════ */
+function setupReports(){
+  document.querySelectorAll('[data-rtab]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('[data-rtab]').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      const tab=btn.dataset.rtab;
+      hide('rtab-logs'); hide('rtab-pdf');
+      show('rtab-'+tab);
+      if(tab==='logs') loadLogs();
+      else loadPdfPreview();
+    });
+  });
+  $('btn-refresh-log').addEventListener('click',loadLogs);
+  $('log-days').addEventListener('change',loadLogs);
+  $('btn-gen-pdf').addEventListener('click',generateComprehensivePDF);
+  $('btn-dl-log-pdf').addEventListener('click',downloadLogAsPDF);
+}
+
+// Auto-load reports when tab is opened
+document.addEventListener('click',e=>{
+  if(e.target.closest('[data-page="reports"]')) setTimeout(()=>{ loadLogs(); loadPdfPreview(); },100);
+});
+
+async function loadLogs(){
+  const days=$('log-days').value;
+  hide('report-err');
+  $('log-list').innerHTML='<div class="spinner-wrap"><div class="spinner"></div></div>';
+  try{
+    const data=await AR('/reports/activity-log?days='+days);
+    state.logCache=data.log_entries||[];
+    if(!state.logCache.length){$('log-list').innerHTML='<div style="text-align:center;padding:2rem;color:var(--text3)">No activity in this period</div>';return;}
+    renderLogList(state.logCache);
+  }catch(e){
+    $('report-err').textContent='⚠️ Cannot reach reporting service (port 5002). Start: python reporting_services_v2.py';
+    show('report-err');
+    $('log-list').innerHTML='<div style="text-align:center;padding:2rem;color:var(--text3)">Service offline</div>';
+  }
+}
+
+function actionColor(ac){
+  ac=ac||'';
+  if(/add|creat/i.test(ac)) return 'var(--green)';
+  if(/delet|remov/i.test(ac)) return 'var(--red)';
+  if(/updat|edit|chang/i.test(ac)) return 'var(--amber)';
+  return 'var(--blue2)';
+}
+
+function renderLogList(logs){
+  $('log-list').innerHTML=logs.map(l=>`
+    <div class="log-item">
+      <div class="flex justify-between items-center flex-wrap" style="gap:.5rem">
+        <span class="fw6" style="color:${actionColor(l.action)}">${l.action||'—'}${l.item_name?` <span style="color:var(--cyan)">· ${l.item_name}</span>`:''}</span>
+        <span class="text-sm text-muted"><span style="color:var(--cyan2)">${l.username||'system'}</span>${l.full_name?' · '+l.full_name:''} · ${new Date(l.created_at).toLocaleString()}</span>
+      </div>
+      ${l.details?`<div class="text-sm text-muted" style="margin-top:.25rem">📌 ${l.details}</div>`:''}
+    </div>`).join('');
+}
+
+async function loadPdfPreview(){
+  try{
+    const d=await AR('/reports/comprehensive');
+    const inv=d.inventory_overview||{},al=d.alerts_overview||{},us=d.users_overview||{};
+    $('pdf-preview').innerHTML=[
+      ['📦 SKUs',inv.total_items||'—'],['🔔 Alerts',al.active||'—'],
+      ['💰 Value','$'+parseFloat(inv.total_value||0).toFixed(0)],['👥 Users',us.total_users||'—'],
+      ['❌ Out of Stock',inv.out_of_stock||'—'],['⚠️ Low Stock',inv.low_stock||'—'],
+    ].map(([k,v])=>`<div style="background:rgba(30,41,59,.7);border-radius:7px;padding:.65rem;text-align:center"><div style="font-size:1.2rem;font-weight:700;color:var(--cyan)">${v}</div><div style="font-size:.68rem;color:var(--text3);margin-top:.2rem">${k}</div></div>`).join('');
+    window._rprtData=d;
+  }catch{
+    $('pdf-preview').innerHTML='<span style="color:var(--text3);font-size:.82rem">Preview unavailable — reporting service offline</span>';
+  }
+}
+
+/* Download Activity Log as PDF */
+async function downloadLogAsPDF(){
+  const btn=$('btn-dl-log-pdf');
+  btn.disabled=true; btn.textContent='⏳ Generating…';
+  try{
+    await ensureJsPDF();
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF();
+    const logs=state.logCache;
+
+    doc.setFillColor(10,14,39); doc.rect(0,0,210,36,'F');
+    doc.setTextColor(96,165,250); doc.setFontSize(16); doc.setFont('helvetica','bold');
+    doc.text('ACTIVITY LOG',105,16,{align:'center'});
+    doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(180,190,205);
+    doc.text('Generated: '+new Date().toLocaleString()+' | Period: '+$('log-days').value+' days',105,27,{align:'center'});
+
+    if(logs.length){
+      doc.autoTable({
+        startY:44,
+        head:[['Action','Item','User','Date/Time','Details']],
+        body:logs.map(l=>[
+          l.action||'—',
+          l.item_name||'—',
+          (l.username||'system')+(l.full_name?' ('+l.full_name+')':''),
+          l.created_at?new Date(l.created_at).toLocaleString():'—',
+          (l.details||'').slice(0,60)+(l.details&&l.details.length>60?'…':''),
+        ]),
+        headStyles:{fillColor:[10,14,39],textColor:[96,165,250]},
+        alternateRowStyles:{fillColor:[20,30,50]},
+        styles:{textColor:[200,210,220],fontSize:8},
+        columnStyles:{0:{cellWidth:28},1:{cellWidth:30},2:{cellWidth:35},3:{cellWidth:30},4:{cellWidth:'auto'}},
+        margin:{left:10,right:10},
+      });
+    } else {
+      doc.setTextColor(200,200,200); doc.setFontSize(10);
+      doc.text('No activity records found for this period.',105,60,{align:'center'});
+    }
+
+    doc.setFontSize(7); doc.setTextColor(80,100,120);
+    doc.text('Inventory Management System · Activity Log Export',105,288,{align:'center'});
+    doc.save('activity_log_'+new Date().toISOString().slice(0,10)+'.pdf');
+  }catch(e){ alert('PDF error: '+e.message); }
+  finally{ btn.disabled=false; btn.textContent='⬇ Download as PDF'; }
+}
+
+/* Comprehensive PDF */
+async function generateComprehensivePDF(){
+  const btn=$('btn-gen-pdf'); btn.disabled=true; btn.textContent='⏳ Generating…';
+  try{
+    await ensureJsPDF();
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF();
+    const pd=window._rprtData||(await AR('/reports/comprehensive').catch(()=>null));
+
+    doc.setFillColor(10,14,39); doc.rect(0,0,210,36,'F');
+    doc.setTextColor(96,165,250); doc.setFontSize(17); doc.setFont('helvetica','bold');
+    doc.text('INVENTORY REPORT',105,16,{align:'center'});
+    doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(180,190,205);
+    doc.text('Generated: '+new Date().toLocaleString(),105,27,{align:'center'});
+
+    const tOpts={headStyles:{fillColor:[10,14,39],textColor:[96,165,250]},alternateRowStyles:{fillColor:[20,30,50]},styles:{textColor:[200,210,220],fontSize:9},margin:{left:14,right:14}};
+    let y=46;
+
+    if(pd){
+      const inv=pd.inventory_overview||{},al=pd.alerts_overview||{},us=pd.users_overview||{};
+      doc.setTextColor(34,211,238); doc.setFontSize(11); doc.setFont('helvetica','bold');
+      doc.text('INVENTORY OVERVIEW',14,y); y+=5;
+      doc.autoTable({...tOpts,startY:y,head:[['Metric','Value']],body:[
+        ['Total Items',inv.total_items||'—'],['Total Quantity',inv.total_qty||'—'],
+        ['Total Value','$'+parseFloat(inv.total_value||0).toFixed(2)],
+        ['Out of Stock',inv.out_of_stock||'—'],['Low Stock',inv.low_stock||'—'],
+      ]});
+      y=doc.lastAutoTable.finalY+10;
+      doc.setTextColor(34,211,238); doc.text('ALERTS & USERS',14,y); y+=5;
+      doc.autoTable({...tOpts,startY:y,head:[['Metric','Value']],body:[
+        ['Active Alerts',al.active||'—'],['Resolved',al.resolved||'—'],
+        ['Total Users',us.total_users||'—'],['Admins',us.admins||'—'],
+        ['Managers',us.managers||'—'],['Employees',us.employees||'—'],
+      ]});
+      y=doc.lastAutoTable.finalY+10;
+      if(pd.top_categories&&pd.top_categories.length){
+        if(y>210){doc.addPage();y=20;}
+        doc.setTextColor(34,211,238); doc.text('TOP CATEGORIES',14,y); y+=5;
+        doc.autoTable({...tOpts,startY:y,head:[['Category','Items','Value']],
+          body:pd.top_categories.map(c=>[c.category||'—',c.items,'$'+parseFloat(c.value||0).toFixed(2)])});
+      }
+    } else {
+      doc.setTextColor(248,113,113); doc.text('Reporting service unavailable.',14,y);
+    }
+    doc.setFontSize(7); doc.setTextColor(80,100,120); doc.text('Inventory Management System',105,288,{align:'center'});
+    doc.save('inventory_report_'+new Date().toISOString().slice(0,10)+'.pdf');
+  }catch(e){ alert('PDF error: '+e.message); }
+  finally{ btn.disabled=false; btn.textContent='⬇ Download PDF'; }
+}
+
+async function ensureJsPDF(){
+  if(window.jspdf) return;
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js');
+}
+function loadScript(src){
+  return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+}
+
+/* ═══════════ SETTINGS ═══════════ */
+function renderSettings(){
+  const u=state.user;
+  $('settings-avatar').textContent=initials(u.full_name);
+  $('settings-fields').innerHTML=`
+    <div class="fg"><label class="lbl">Full Name</label><input class="inp" id="sf-name" value="${u.full_name||''}"></div>
+    <div class="fg"><label class="lbl">Email</label><input class="inp" type="email" id="sf-email" value="${u.email||''}"></div>
+    <div class="fg"><label class="lbl">Phone</label><input class="inp" type="tel" id="sf-phone" value="${u.phone||''}"></div>
+    <div class="fg"><label class="lbl">Username</label><input class="inp" value="${u.username}" disabled></div>
+    <div class="fg"><label class="lbl">Role</label><input class="inp" value="${u.role.toUpperCase()}" disabled></div>
+    ${u.location_name?`<div class="fg"><label class="lbl">Location</label><input class="inp" value="${u.location_name}" disabled></div>`:''}
+    <div class="fg"><label class="lbl">New Password</label><input class="inp" type="password" id="sf-pass" placeholder="Leave blank to keep"></div>
+    <div class="fg"><label class="lbl">Confirm Password</label><input class="inp" type="password" id="sf-conf"></div>`;
+  $('photo-file').onchange=e=>{
+    const f=e.target.files[0]; if(!f) return;
+    const r=new FileReader(); r.onload=ev=>{ $('settings-avatar').innerHTML=`<img src="${ev.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`; }; r.readAsDataURL(f);
+  };
+  $('btn-save-settings').onclick=async()=>{
+    const pass=$('sf-pass').value, conf=$('sf-conf').value;
+    if(pass&&pass!==conf){alert('Passwords do not match');return;}
+    const body={full_name:$('sf-name').value,email:$('sf-email').value,phone:$('sf-phone').value};
+    if(pass) body.password=pass;
+    try{
+      await A('/users/'+u.id,jbody('PUT',body));
+      const ph=$('photo-file').files[0];
+      if(ph){const fd=new FormData();fd.append('photo',ph);await fetch(API+'/users/'+u.id+'/photo',{method:'POST',headers:{Authorization:'Bearer '+token()},body:fd});}
+      alert('Settings saved!'); $('sf-pass').value=''; $('sf-conf').value='';
+    }catch(err){alert(err.message);}
+  };
+}
+
+/* ═══════════ BOOT ═══════════ */
+(function boot(){
+  if(typeof Chart==='undefined'){
+    loadScript('https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js').then(resume).catch(resume);
+  } else { resume(); }
+  function resume(){
+    try{
+      const t=localStorage.getItem('token'), u=localStorage.getItem('user');
+      if(t&&u){ state.user=JSON.parse(u); showWelcome(); }
+      else{ showOnly('view-login'); $('inp-user').focus(); }
+    }catch(e){ localStorage.clear(); showOnly('view-login'); $('inp-user').focus(); }
+  }
+})();
+</script>
+</body>
+</html>
