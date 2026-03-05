@@ -1,0 +1,65 @@
+services:
+
+  db:
+    build: ./DB
+    container_name: Our_DB
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  backend:
+    build: ./backend
+    container_name: BE
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: inventory
+    depends_on:
+      - db
+      - alert_service
+      - reporting_service
+    ports:
+      - "5000:5000"
+
+  alert_service:
+    build: ./alert-service
+    container_name: Alert_Service
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: inventory
+    depends_on:
+      - db
+    ports:
+      - "5001:5001"
+
+  reporting_service:
+    build: ./reporting-service
+    container_name: Reporting_Service
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: inventory
+    depends_on:
+      - db
+    ports:
+      - "5002:5002"
+
+  nginx:
+    build: ./FrontEnd
+    container_name: FE
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+
+volumes:
+  pg_data:
