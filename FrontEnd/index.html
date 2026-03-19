@@ -181,6 +181,7 @@ tr.tr-expanded{background:rgba(59,130,246,.08)!important}
 .qty-btn{width:24px;height:24px;border-radius:5px;border:1px solid rgba(59,130,246,.28);background:rgba(59,130,246,.1);color:var(--blue2);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.95rem;font-weight:700;transition:all .13s;user-select:none;flex-shrink:0}
 .qty-btn:hover{background:rgba(59,130,246,.25);border-color:var(--blue2)}
 .qty-val{min-width:38px;text-align:center;font-weight:600;font-size:.835rem}
+.qty-input{width:50px;text-align:center;padding:.2rem .3rem;border:1px solid rgba(59,130,246,.28);border-radius:4px;background:rgba(30,41,59,.5);color:var(--text);font-size:.835rem;font-weight:600;font-family:inherit}
 
 /* ── EXPAND ── */
 .expand-btn{background:none;border:none;color:var(--blue2);cursor:pointer;font-size:.82rem;padding:.2rem .35rem;transition:transform .18s;display:inline-flex;align-items:center;font-family:inherit}
@@ -260,6 +261,11 @@ tr.tr-expanded{background:rgba(59,130,246,.08)!important}
           <div class="user-role" id="sb-role"></div>
           <div id="sb-loc" style="font-size:.66rem;color:var(--cyan);margin-top:.1rem"></div>
         </div>
+      </div>
+      <div class="logos" style="display:flex;gap:.5rem;justify-content:center;margin-top:.75rem">
+        <img src="assets/logos/MCEN.png" alt="Logo 1" style="width:64px;height:64px;object-fit:contain" onerror="this.style.display='none'">
+        <img src="assets/logos/AGEN.png" alt="Logo 2" style="width:64px;height:64px;object-fit:contain" onerror="this.style.display='none'">
+        <img src="assets/logos/depiEN.png" alt="Logo 2" style="width:64px;height:64px;object-fit:contain" onerror="this.style.display='none'">
       </div>
     </div>
   </div>
@@ -432,7 +438,6 @@ tr.tr-expanded{background:rgba(59,130,246,.08)!important}
         <div class="card-body">
           <div style="text-align:center;margin-bottom:1.5rem">
             <div class="avatar" id="settings-avatar" style="width:88px;height:88px;font-size:1.9rem;margin:0 auto .65rem"></div>
-            <label class="btn btn-secondary btn-sm" style="cursor:pointer">Change Photo<input type="file" id="photo-file" accept="image/*" style="display:none"></label>
           </div>
           <div class="fgrid" id="settings-fields"></div>
           <button class="btn btn-primary" id="btn-save-settings" style="margin-top:.5rem">Save Changes</button>
@@ -477,6 +482,37 @@ tr.tr-expanded{background:rgba(59,130,246,.08)!important}
   </div>
 </div>
 
+<!-- EDIT QUANTITY MODAL -->
+<div id="modal-edit-qty" class="overlay hidden">
+  <div class="modal" style="max-width:320px">
+    <div class="modal-hdr">
+      <div class="modal-title">✏️ Edit Quantity</div>
+      <button class="modal-close" data-close="modal-edit-qty">×</button>
+    </div>
+    <div style="padding:1.25rem">
+      <div class="fg">
+        <label class="lbl">New Quantity</label>
+        <input type="number" class="inp" id="edit-qty-input" min="0" placeholder="Enter quantity">
+      </div>
+      <div style="display:flex;gap:.75rem;margin-top:1.25rem">
+        <button class="btn btn-primary" id="edit-qty-save">Save</button>
+        <button class="btn btn-secondary" onclick="hide('modal-edit-qty')">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD/REMOVE PANEL MODAL -->
+<div id="modal-add-remove" class="overlay hidden">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-hdr">
+      <div class="modal-title" id="ar-title">📦 Add/Remove Stock</div>
+      <button class="modal-close" data-close="modal-add-remove">×</button>
+    </div>
+    <div id="ar-body"></div>
+  </div>
+</div>
+
 <!-- NOTIF PERMISSION BANNER -->
 <div id="notif-banner" class="hidden" style="position:fixed;bottom:1.25rem;right:1.25rem;background:rgba(10,14,30,.97);border:1px solid rgba(59,130,246,.35);border-radius:12px;padding:1rem 1.25rem;max-width:320px;z-index:2000;box-shadow:0 8px 30px rgba(0,0,0,.55)">
   <div style="font-weight:700;margin-bottom:.4rem;font-size:.9rem">🔔 Enable Notifications</div>
@@ -489,9 +525,9 @@ tr.tr-expanded{background:rgba(59,130,246,.08)!important}
 
 <script>
 /* ═══════════ CONFIG ═══════════ */
-const API   = 'http://127.0.0.1/api';
-const ALERT = 'http://127.0.0.1/alerts';
-const RPRT  = 'http://127.0.0.1/reports';
+const API   = '/api';
+const ALERT = '/alerts';
+const RPRT  = '/reports';
 
 let state = {
   user: null, items: [], locations: [], alerts: [], analytics: null,
@@ -536,7 +572,13 @@ async function apiFetch(base, path, opts={}) {
 const A  = (p,o)=>apiFetch(API, p, o);
 const AR = (p,o)=>apiFetch(RPRT, p, o);
 async function alertFetch(path, opts={}){
-  try{ const r=await fetch(ALERT+path, opts); return r.ok?r.json():[]; }catch{ return []; }
+  try{
+    const url = ALERT + (path||'');
+    const r = await fetch(url, opts);
+    return r.ok ? await r.json() : [];
+  }catch{
+    return [];
+  }
 }
 const jbody = (method,body) => ({method, body:JSON.stringify(body)});
 
@@ -599,7 +641,9 @@ function buildSidebar(){
       showPage(el.dataset.page); loadPage(el.dataset.page);
     });
   });
-  $('sb-avatar').textContent=initials(u.full_name);
+  // Always show initials
+  const sbAvatar=$('sb-avatar');
+  sbAvatar.innerHTML=initials(u.full_name);
   $('sb-username').textContent=u.full_name;
   $('sb-role').textContent=u.role;
   if(u.location_name) $('sb-loc').textContent='📍 '+u.location_name;
@@ -673,11 +717,37 @@ async function initApp(){
 }
 
 /* ═══════════ LOADERS ═══════════ */
-async function loadAnalytics(){ state.analytics=await A('/analytics/summary').catch(()=>null); }
-async function loadItems(){ const d=await A('/items').catch(()=>[]); state.items=Array.isArray(d)?d:[]; }
-async function loadLocations(){ const d=await A('/locations').catch(()=>[]); state.locations=Array.isArray(d)?d:[]; }
+async function loadAnalytics(){
+  try{
+    state.analytics=await A('/analytics/summary');
+    console.log('✅ Analytics loaded:', state.analytics);
+  }catch(err){
+    console.warn('⚠️ Analytics load failed:', err.message);
+    state.analytics=null;
+  }
+}
+async function loadItems(){
+  try{
+    const d=await A('/items');
+    state.items=Array.isArray(d)?d:[];
+    console.log('✅ Items loaded:', state.items.length, 'items');
+  }catch(err){
+    console.warn('⚠️ Items load failed:', err.message);
+    state.items=[];
+  }
+}
+async function loadLocations(){
+  try{
+    const d=await A('/locations');
+    state.locations=Array.isArray(d)?d:[];
+    console.log('✅ Locations loaded:', state.locations.length, 'locations');
+  }catch(err){
+    console.warn('⚠️ Locations load failed:', err.message);
+    state.locations=[];
+  }
+}
 async function loadAlerts(){
-  const d=await alertFetch('/alerts');
+  const d=await alertFetch('');
   const fresh=Array.isArray(d)?d:[];
   // detect NEW alerts (ids not seen before) → fire Chrome notification
   fresh.forEach(a=>{
@@ -727,11 +797,7 @@ function renderEmployeeHome(){
     const locId=u.location_id;
     const myStock=state.stockCache[i.id]?.find(s=>s.location_id===locId);
     const dispQty=myStock?myStock.quantity:i.quantity;
-    const qtyCtrl=locId?`<div class="qty-ctrl">
-      <div class="qty-btn" onclick="empChangeQty(${i.id},${locId},${dispQty},-1)">−</div>
-      <span class="qty-val" id="emp-qty-${i.id}">${dispQty}</span>
-      <div class="qty-btn" onclick="empChangeQty(${i.id},${locId},${dispQty},+1)">+</div>
-    </div>`:`<span>${dispQty}</span>`;
+    const qtyCtrl=locId?`<span id="emp-qty-${i.id}">${dispQty}</span> <button class="btn btn-primary btn-sm" onclick="openAddRemovePanel(${i.id}, ${locId})">Add/Remove</button>`:`<span>${dispQty}</span>`;
     return `<tr>
       <td><b>${i.name}</b></td>
       <td style="font-family:monospace;font-size:.75rem;color:var(--text3)">${i.sku||'—'}</td>
@@ -742,23 +808,7 @@ function renderEmployeeHome(){
   }).join('');
 }
 
-async function empChangeQty(itemId,locId,cur,delta){
-  const newQty=Math.max(0,cur+delta);
-  try{
-    await A('/items/'+itemId+'/locations/'+locId,jbody('PUT',{quantity:newQty}));
-    // Update stockCache
-    if(state.stockCache[itemId]){
-      const s=state.stockCache[itemId].find(s=>s.location_id===locId);
-      if(s) s.quantity=newQty;
-    }
-    await loadItems();
-    // update the qty display in employee table without full re-render
-    const el=$('emp-qty-'+itemId);
-    if(el) el.textContent=newQty;
-    // refresh full table
-    renderEmployeeHome();
-  }catch(err){alert(err.message);}
-}
+
 
 /* ═══════════════════════════════════════════════
    DASHBOARD
@@ -772,7 +822,8 @@ function renderDashboard(){
     {lbl:'Active Alerts',  val:state.alerts.length,           icon:'🔔'},
     {lbl:'Inventory Value',val:fmtMoney(ana.inventory_value||0),icon:'💰'},
   ];
-  $('stats-grid').innerHTML=stats.map(s=>`
+  const statsGrid=$('stats-grid');
+  if(statsGrid) statsGrid.innerHTML=stats.map(s=>`
     <div class="stat-card">
       <div class="stat-lbl">${s.lbl}</div>
       <div class="stat-val">${s.val}</div>
@@ -782,26 +833,39 @@ function renderDashboard(){
   // Destroy old charts
   ['line','donut','itemsPie'].forEach(k=>{ if(state.charts[k]){state.charts[k].destroy();state.charts[k]=null;} });
 
-  const base=ana.total_items||20;
-  state.charts.line=new Chart($('chart-line'),{
-    type:'line',
-    data:{labels:['6d ago','5d ago','4d ago','3d ago','2d ago','Yesterday','Today'],
-      datasets:[{label:'SKUs',fill:true,tension:.4,
-        data:[base-12,base-8,base-5,base,base+2,base+5,base],
-        borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,.1)'}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
-      scales:{y:{beginAtZero:false,grid:{color:'rgba(71,85,105,.18)'},ticks:{color:'#94a3b8'}},
-              x:{grid:{display:false},ticks:{color:'#94a3b8'}}}}
-  });
-
-  const cats=ana.categories||[];
-  if(cats.length){
-    state.charts.donut=new Chart($('chart-donut'),{
-      type:'doughnut',
-      data:{labels:cats.map(c=>c.category||'Other'),datasets:[{data:cats.map(c=>c.count),backgroundColor:['#3b82f6','#22d3ee','#34d399','#fbbf24','#f87171','#a78bfa','#f472b6']}]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#cbd5e1',padding:9,font:{size:11}}}}}
-    });
+  if(typeof Chart==='undefined'){
+    console.warn('Chart.js not loaded; skipping dashboard charts');
+  } else {
+    try{
+      const chartLine=$('chart-line');
+      if(chartLine){
+        const base=ana.total_items||20;
+        state.charts.line=new Chart(chartLine,{
+          type:'line',
+          data:{labels:['6d ago','5d ago','4d ago','3d ago','2d ago','Yesterday','Today'],
+            datasets:[{label:'SKUs',fill:true,tension:.4,
+              data:[base-12,base-8,base-5,base,base+2,base+5,base],
+              borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,.1)'}]},
+          options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+            scales:{y:{beginAtZero:false,grid:{color:'rgba(71,85,105,.18)'},ticks:{color:'#94a3b8'}},
+                    x:{grid:{display:false},ticks:{color:'#94a3b8'}}}}
+        });
+      }
+    }catch(e){console.warn('Line chart error:',e);}
   }
+  try{
+    const chartDonut=$('chart-donut');
+    if(chartDonut){
+      const cats=ana.categories||[];
+      if(cats.length){
+        state.charts.donut=new Chart(chartDonut,{
+          type:'doughnut',
+          data:{labels:cats.map(c=>c.category||'Other'),datasets:[{data:cats.map(c=>c.count),backgroundColor:['#3b82f6','#22d3ee','#34d399','#fbbf24','#f87171','#a78bfa','#f472b6']}]},
+          options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#cbd5e1',padding:9,font:{size:11}}}}}
+        });
+      }
+    }
+  }catch(e){console.warn('Donut chart error:',e);}
 
   renderItemsBreakdown();
   renderAlerts();
@@ -809,118 +873,128 @@ function renderDashboard(){
 
 /* NEW: Pie chart of all items by quantity + horizontal bar breakdown */
 function renderItemsBreakdown(){
-  if(!state.items.length) return;
+  if(!state.items||!state.items.length) return;
 
-  // top 12 items for clarity
-  const sorted=[...state.items].sort((a,b)=>b.quantity-a.quantity).slice(0,12);
-  const COLORS=['#3b82f6','#22d3ee','#34d399','#fbbf24','#f87171','#a78bfa','#f472b6','#fb923c','#4ade80','#38bdf8','#c084fc','#e879f9'];
+  try{
+    // top 12 items for clarity
+    const sorted=[...state.items].sort((a,b)=>b.quantity-a.quantity).slice(0,12);
+    const COLORS=['#3b82f6','#22d3ee','#34d399','#fbbf24','#f87171','#a78bfa','#f472b6','#fb923c','#4ade80','#38bdf8','#c084fc','#e879f9'];
 
-  if(state.charts.itemsPie){state.charts.itemsPie.destroy();state.charts.itemsPie=null;}
+    if(state.charts.itemsPie){state.charts.itemsPie.destroy();state.charts.itemsPie=null;}
 
-  const canvas=$('chart-items-pie');
-  if(canvas){
-    state.charts.itemsPie=new Chart(canvas,{
-      type:'pie',
-      data:{
-        labels:sorted.map(i=>i.name+(i.quantity===0?' (0)':'')),
-        datasets:[{data:sorted.map(i=>Math.max(i.quantity,0.1)),backgroundColor:COLORS}]
-      },
-      options:{responsive:true,maintainAspectRatio:false,
-        plugins:{
-          legend:{position:'bottom',labels:{color:'#cbd5e1',padding:8,font:{size:10},boxWidth:12}},
-          tooltip:{callbacks:{label:ctx=>{
-            const item=sorted[ctx.dataIndex];
-            return ` ${item.name}: ${item.quantity} units`;
-          }}}
+    const canvas=$('chart-items-pie');
+    if(canvas){
+      state.charts.itemsPie=new Chart(canvas,{
+        type:'pie',
+        data:{
+          labels:sorted.map(i=>i.name+(i.quantity===0?' (0)':'')),
+          datasets:[{data:sorted.map(i=>Math.max(i.quantity,0.1)),backgroundColor:COLORS}]
+        },
+        options:{responsive:true,maintainAspectRatio:false,
+          plugins:{
+            legend:{position:'bottom',labels:{color:'#cbd5e1',padding:8,font:{size:10},boxWidth:12}},
+            tooltip:{callbacks:{label:ctx=>{
+              const item=sorted[ctx.dataIndex];
+              return ` ${item.name}: ${item.quantity} units`;
+            }}}
+          }
         }
-      }
-    });
-  }
+      });
+    }
 
-  // Horizontal bar breakdown
-  const maxQty=Math.max(...sorted.map(i=>i.quantity),1);
-  $('prod-breakdown').innerHTML=sorted.map((item,idx)=>{
-    const pct=Math.max((item.quantity/maxQty)*100,1);
-    const col=COLORS[idx%COLORS.length];
-    const isLow=item.quantity>0&&item.quantity<item.min_quantity;
-    const isOos=item.quantity===0;
-    return `<div class="prod-bar-row">
-      <div class="prod-bar-name" title="${item.name}">${item.name}</div>
-      <div class="prod-bar-track">
-        <div class="prod-bar-fill" style="width:${pct}%;background:${isOos?'var(--red)':isLow?'var(--amber)':col}"></div>
-      </div>
-      <div class="prod-bar-val" style="color:${isOos?'var(--red)':isLow?'var(--amber)':col}">${item.quantity}</div>
-    </div>`;
-  }).join('');
+    // Horizontal bar breakdown
+    const maxQty=Math.max(...sorted.map(i=>i.quantity),1);
+    const prodBreakdown=$('prod-breakdown');
+    if(prodBreakdown){
+      prodBreakdown.innerHTML=sorted.map((item,idx)=>{
+        const pct=Math.max((item.quantity/maxQty)*100,1);
+        const col=COLORS[idx%COLORS.length];
+        const isLow=item.quantity>0&&item.quantity<item.min_quantity;
+        const isOos=item.quantity===0;
+        return `<div class="prod-bar-row">
+          <div class="prod-bar-name" title="${item.name}">${item.name}</div>
+          <div class="prod-bar-track">
+            <div class="prod-bar-fill" style="width:${pct}%;background:${isOos?'var(--red)':isLow?'var(--amber)':col}"></div>
+          </div>
+          <div class="prod-bar-val" style="color:${isOos?'var(--red)':isLow?'var(--amber)':col}">${item.quantity}</div>
+        </div>`;
+      }).join('');
+    }
+  }catch(e){console.warn('Items breakdown error:',e);}
 }
 
 /* ═══════════ ALERTS ═══════════ */
 function renderAlerts(){
-  const sec=$('alerts-section');
-  const total=state.alerts.length;
-  const crit=state.alerts.filter(a=>a.alert_type==='out_of_stock').length;
-  const warn=state.alerts.filter(a=>a.alert_type!=='out_of_stock').length;
+  try{
+    const sec=$('alerts-section');
+    if(!sec) return;
+    
+    const total=state.alerts?state.alerts.length:0;
+    const crit=state.alerts?state.alerts.filter(a=>a.alert_type==='out_of_stock').length:0;
+    const warn=state.alerts?state.alerts.filter(a=>a.alert_type!=='out_of_stock').length:0;
 
-  // Compute "above average" — items whose qty is above mean are healthy
-  const qtys=state.items.map(i=>i.quantity);
-  const avg=qtys.length?(qtys.reduce((a,b)=>a+b,0)/qtys.length):0;
-  const aboveAvg=state.items.filter(i=>i.quantity>avg).length;
-  const belowAvg=state.items.filter(i=>i.quantity<=avg&&i.quantity>0).length;
-  const oos=state.items.filter(i=>i.quantity===0).length;
-  const totalItems=state.items.length||1;
+    // Compute "above average" — items whose qty is above mean are healthy
+    const qtys=state.items?state.items.map(i=>i.quantity):[];
+    const avg=qtys.length?(qtys.reduce((a,b)=>a+b,0)/qtys.length):0;
+    const aboveAvg=state.items?state.items.filter(i=>i.quantity>avg).length:0;
+    const belowAvg=state.items?state.items.filter(i=>i.quantity<=avg&&i.quantity>0).length:0;
+    const oos=state.items?state.items.filter(i=>i.quantity===0).length:0;
+    const totalItems=state.items?state.items.length:1;
 
-  if(!total&&!state.items.length){ sec.innerHTML=''; return; }
+    if(!total&&!state.items?.length){ sec.innerHTML=''; return; }
 
-  sec.innerHTML=`
-  <div style="margin-bottom:1.25rem">
-    <div class="fw7" style="font-size:1.05rem;margin-bottom:1rem">🔔 Alert Summary</div>
+    sec.innerHTML=`
+    <div style="margin-bottom:1.25rem">
+      <div class="fw7" style="font-size:1.05rem;margin-bottom:1rem">🔔 Alert Summary</div>
 
-    <!-- Count cards -->
-    <div class="alert-summary-grid">
-      <div class="alert-count-card">
-        <div class="alert-count-num" style="color:var(--red)">${crit}</div>
-        <div class="alert-count-lbl">Out of Stock</div>
-        <div class="alert-bar"><div class="alert-bar-fill" style="width:${(crit/totalItems*100).toFixed(1)}%;background:var(--red)"></div></div>
-      </div>
-      <div class="alert-count-card">
-        <div class="alert-count-num" style="color:var(--amber)">${warn}</div>
-        <div class="alert-count-lbl">Low Stock</div>
-        <div class="alert-bar"><div class="alert-bar-fill" style="width:${(warn/totalItems*100).toFixed(1)}%;background:var(--amber)"></div></div>
-      </div>
-      <div class="alert-count-card">
-        <div class="alert-count-num" style="color:var(--green)">${aboveAvg}</div>
-        <div class="alert-count-lbl">Above Average</div>
-        <div class="alert-bar"><div class="alert-bar-fill" style="width:${(aboveAvg/totalItems*100).toFixed(1)}%;background:var(--green)"></div></div>
-      </div>
-      <div class="alert-count-card">
-        <div class="alert-count-num" style="color:var(--blue2)">${belowAvg}</div>
-        <div class="alert-count-lbl">Below Average</div>
-        <div class="alert-bar"><div class="alert-bar-fill" style="width:${(belowAvg/totalItems*100).toFixed(1)}%;background:var(--blue2)"></div></div>
-      </div>
-    </div>
-
-    <!-- Average label -->
-    <div style="text-align:center;font-size:.78rem;color:var(--text3);margin:.75rem 0">
-      Average stock level: <span style="color:var(--cyan);font-weight:700">${avg.toFixed(1)} units/SKU</span>
-      &nbsp;·&nbsp; ${totalItems} total SKUs tracked
-    </div>
-
-    <!-- Alert list -->
-    ${total>0?`<div class="fw6" style="margin-bottom:.65rem;color:var(--amber)">⚠️ Active Alerts (${total})</div>`:''}
-    ${state.alerts.map(a=>`
-      <div class="alert-item${a.alert_type==='out_of_stock'?' crit':''}">
-        <span style="font-size:1.2rem">${a.alert_type==='out_of_stock'?'❌':'⚠️'}</span>
-        <div style="flex:1;min-width:0">
-          <div class="fw6">${a.item_name||a.message||'Alert'}</div>
-          <div class="text-sm text-muted">
-            ${a.quantity!=null?`Qty: <b style="color:${a.alert_type==='out_of_stock'?'var(--red)':'var(--amber)'}">${a.quantity}</b> | Min required: ${a.min_quantity}`:''}
-            ${a.category?' | '+a.category:''}
-          </div>
+      <!-- Count cards -->
+      <div class="alert-summary-grid">
+        <div class="alert-count-card">
+          <div class="alert-count-num" style="color:var(--red)">${crit}</div>
+          <div class="alert-count-lbl">Out of Stock</div>
+          <div class="alert-bar"><div class="alert-bar-fill" style="width:${(crit/totalItems*100).toFixed(1)}%;background:var(--red)"></div></div>
         </div>
-        <button class="alert-resolve" onclick="resolveAlert(${a.id})">✓ Resolve</button>
-      </div>`).join('')}
-    ${total===0?'<div style="text-align:center;padding:.75rem;color:var(--green);font-weight:600">✅ No active alerts</div>':''}
-  </div>`;
+        <div class="alert-count-card">
+          <div class="alert-count-num" style="color:var(--amber)">${warn}</div>
+          <div class="alert-count-lbl">Low Stock</div>
+          <div class="alert-bar"><div class="alert-bar-fill" style="width:${(warn/totalItems*100).toFixed(1)}%;background:var(--amber)"></div></div>
+        </div>
+        <div class="alert-count-card">
+          <div class="alert-count-num" style="color:var(--green)">${aboveAvg}</div>
+          <div class="alert-count-lbl">Above Average</div>
+          <div class="alert-bar"><div class="alert-bar-fill" style="width:${(aboveAvg/totalItems*100).toFixed(1)}%;background:var(--green)"></div></div>
+        </div>
+        <div class="alert-count-card">
+          <div class="alert-count-num" style="color:var(--blue2)">${belowAvg}</div>
+          <div class="alert-count-lbl">Below Average</div>
+          <div class="alert-bar"><div class="alert-bar-fill" style="width:${(belowAvg/totalItems*100).toFixed(1)}%;background:var(--blue2)"></div></div>
+        </div>
+      </div>
+
+      <!-- Average label -->
+      <div style="text-align:center;font-size:.78rem;color:var(--text3);margin:.75rem 0">
+        Average stock level: <span style="color:var(--cyan);font-weight:700">${avg.toFixed(1)} units/SKU</span>
+        &nbsp;·&nbsp; ${totalItems} total SKUs tracked
+      </div>
+
+      <!-- Alert list -->
+      ${total>0?`<div class="fw6" style="margin-bottom:.65rem;color:var(--amber)">⚠️ Active Alerts (${total})</div>`:''}
+      ${state.alerts?state.alerts.map(a=>`
+        <div class="alert-item${a.alert_type==='out_of_stock'?' crit':''}">
+          <span style="font-size:1.2rem">${a.alert_type==='out_of_stock'?'❌':'⚠️'}</span>
+          <div style="flex:1;min-width:0">
+            <div class="fw6">${a.item_name||a.message||'Alert'}</div>
+            <div class="text-sm text-muted">
+              ${a.quantity!=null?`Qty: <b style="color:${a.alert_type==='out_of_stock'?'var(--red)':'var(--amber)'}">${a.quantity}</b> | Min required: ${a.min_quantity}`:''}
+              ${a.category?' | '+a.category:''}
+            </div>
+          </div>
+          <button class="alert-resolve" onclick="simpleResolveAlert(${a.id})" style="margin-right:.5rem">✓ Dismiss</button>
+          <button class="alert-resolve" onclick="resolveAlert(${a.id})" style="background:rgba(59,130,246,.14);border-color:rgba(59,130,246,.3);color:var(--blue2)">📦 Restock</button>
+        </div>`).join(''):''}
+      ${total===0?'<div style="text-align:center;padding:.75rem;color:var(--green);font-weight:600">✅ No active alerts</div>':''}
+    </div>`;
+  }catch(e){console.warn('Alert render error:',e);}
 }
 
 /* ─────────────────────────────────────────────
@@ -1033,9 +1107,10 @@ function resolveAlert(alertId){
       hide('modal-resolve');
 
       // 4. Refresh dashboard
-      if(isMgr()) renderAlerts();
-      const statCard=document.querySelectorAll('.stat-card')[3];
-      if(statCard) statCard.querySelector('.stat-val').textContent=state.alerts.length;
+      if(isMgr()) {
+        await loadAnalytics();
+        renderDashboard();
+      }
       if(document.getElementById('page-inventory')&&!document.getElementById('page-inventory').classList.contains('hidden')){
         renderInventory();
       }
@@ -1063,6 +1138,18 @@ function showToast(msg, type='success'){
   t.textContent=msg;
   document.body.appendChild(t);
   setTimeout(()=>{ t.style.opacity='0'; setTimeout(()=>t.remove(),450); },3200);
+}
+
+async function simpleResolveAlert(alertId){
+  if(!confirm('Are you sure you want to dismiss this alert? This will mark it as resolved, but the item may still be low on stock.')) return;
+  try{
+    await alertFetch('/'+alertId+'/resolve', {method:'POST'});
+    await loadAlerts();
+    if(isMgr()) renderAlerts();
+    showToast('✅ Alert dismissed','success');
+  }catch(err){
+    showToast('❌ Error dismissing alert: '+err.message,'error');
+  }
 }
 
 /* ═══════════ PAGE DISPATCH ═══════════ */
@@ -1123,36 +1210,41 @@ function setupInvColumns(){
    INVENTORY
 ═══════════════════════════════════════════════ */
 function renderInventory(){
-  const search=($('inv-search')||{value:''}).value.toLowerCase();
-  const items=state.items.filter(i=>
-    (i.name||'').toLowerCase().includes(search)||
-    (i.sku||'').toLowerCase().includes(search)||
-    (i.category||'').toLowerCase().includes(search)
-  );
-  const cnt=$('inv-count'); if(cnt) cnt.textContent='('+items.length+')';
+  try{
+    if(!state.items||!Array.isArray(state.items)) return;
+    
+    const search=($('inv-search')||{value:''}).value.toLowerCase();
+    const items=state.items.filter(i=>
+      (i.name||'').toLowerCase().includes(search)||
+      (i.sku||'').toLowerCase().includes(search)||
+      (i.category||'').toLowerCase().includes(search)
+    );
+    const cnt=$('inv-count'); if(cnt) cnt.textContent='('+items.length+')';
 
-  const hid=state.hiddenCols;
-  const showCol=k=>!hid.has(k);
+    const hid=state.hiddenCols;
+    const showCol=k=>!hid.has(k);
 
-  // Build thead
-  const ths=[
-    '<th style="width:32px"></th>',
-    '<th>Name</th>',
-    showCol('sku')?'<th>SKU</th>':'',
-    '<th>Total Qty</th>',
-    showCol('min')?'<th>Min</th>':'',
-    showCol('price')?'<th>Price</th>':'',
-    showCol('cat')?'<th>Category</th>':'',
-    '<th>Status</th>',
-    '<th>Actions</th>',
-  ];
-  $('inv-thead').innerHTML='<tr>'+ths.join('')+'</tr>';
+    // Build thead
+    const ths=[
+      '<th style="width:32px"></th>',
+      '<th style="width:60px">Pic</th>',
+      '<th>Name</th>',
+      showCol('sku')?'<th>SKU</th>':'',
+      '<th>Total Qty</th>',
+      showCol('min')?'<th>Min</th>':'',
+      showCol('price')?'<th>Price</th>':'',
+      showCol('cat')?'<th>Category</th>':'',
+      '<th>Status</th>',
+      '<th>Actions</th>',
+    ];
+    const thead=$('inv-thead'); if(thead) thead.innerHTML='<tr>'+ths.join('')+'</tr>';
 
-  const tbody=$('inv-tbody');
-  if(!items.length){ tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--text3)">No items found</td></tr>'; return; }
+    const tbody=$('inv-tbody');
+    if(!tbody) return;
+    if(!items.length){ tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:2rem;color:var(--text3)">No items found</td></tr>'; return; }
 
   let html='';
-  const colspan=9-hid.size;
+  const colspan=10-hid.size;
   for(const item of items){
     const st=item.quantity===0?'<span class="badge badge-danger">Out of Stock</span>':
       item.quantity<item.min_quantity?'<span class="badge badge-warning">Low Stock</span>':
@@ -1160,41 +1252,37 @@ function renderInventory(){
     const isExp=state.expanded===item.id;
     html+=`<tr class="${isExp?'tr-expanded':''}">
       <td><button class="expand-btn${isExp?' open':''}" onclick="toggleExpand(${item.id})">▶</button></td>
+      <td style="text-align:center"><img src="${item.picture_filename?'/api/items/'+item.id+'/picture?t='+Date.now():'/assets/pictures/placeholder.svg'}" alt="${item.name}" 
+           style="width:48px;height:48px;object-fit:cover;border-radius:6px;cursor:pointer;background:rgba(30,41,59,.5)" 
+           onclick="openEditItem(${item.id})" title="Click to edit item picture"/></td>
       <td><b>${item.name}</b></td>
       ${showCol('sku')?`<td style="font-family:monospace;font-size:.75rem;color:var(--text3)">${item.sku||'—'}</td>`:''}
-      <td><div class="qty-ctrl">
-        <div class="qty-btn" onclick="changeItemQty(${item.id},${item.quantity},-1)">−</div>
-        <span class="qty-val">${item.quantity}</span>
-        <div class="qty-btn" onclick="changeItemQty(${item.id},${item.quantity},+1)">+</div>
-      </div></td>
+      <td>${item.quantity}</td>
       ${showCol('min')?`<td>${item.min_quantity}</td>`:''}
       ${showCol('price')?`<td>${fmtMoney(item.price)}</td>`:''}
       ${showCol('cat')?`<td>${item.category||'—'}</td>`:''}
       <td>${st}</td>
       <td><div class="flex gap1">
+        <button class="btn btn-primary btn-sm" onclick="openAddRemovePanel(${item.id}, null)">📦</button>
+        <button class="btn btn-success btn-sm" onclick="showAddNewLocationForm(${item.id})">🏭</button>
         <button class="btn btn-amber btn-sm" onclick="openEditItem(${item.id})">✏️</button>
         <button class="btn btn-danger btn-sm" onclick="deleteItem(${item.id})">🗑️</button>
       </div></td>
     </tr>`;
 
     if(isExp){
-      html+=`<tr class="tr-sub"><td></td><td colspan="${colspan-1}" style="padding-left:2rem;color:var(--cyan);font-weight:700;font-size:.7rem;text-transform:uppercase;letter-spacing:.06em">📍 Warehouse Distribution</td></tr>`;
+      html+=`<tr class="tr-sub"><td></td><td></td><td colspan="${colspan-2}" style="padding-left:2rem;color:var(--cyan);font-weight:700;font-size:.7rem;text-transform:uppercase;letter-spacing:.06em">📍 Warehouse Distribution</td></tr>`;
       const stocks=state.stockCache[item.id]||[];
       const empLocId=state.user.role==='employee'?state.user.location_id:null;
       // Employees see only their location's stock row
       const visibleStocks=empLocId ? stocks.filter(s=>s.location_id===empLocId) : stocks;
 
-      if(!visibleStocks.length) html+=`<tr class="tr-sub"><td></td><td colspan="${colspan-1}" style="padding-left:2.5rem;color:var(--text3);font-style:italic">${empLocId?'Not stocked at your location':'No warehouse assignments yet'}</td></tr>`;
+      if(!visibleStocks.length) html+=`<tr class="tr-sub"><td></td><td></td><td colspan="${colspan-2}" style="padding-left:2.5rem;color:var(--text3);font-style:italic">${empLocId?'Not stocked at your location':'No warehouse assignments yet'}</td></tr>`;
       for(const s of visibleStocks){
         html+=`<tr class="tr-sub">
-          <td></td><td colspan="2" style="padding-left:2.5rem"><span class="loc-badge">📍 ${s.location_name||'Location #'+s.location_id}</span></td>
-          <td><div class="qty-ctrl">
-            <div class="qty-btn" onclick="changeLocQty(${item.id},${s.location_id},${s.quantity},-1)">−</div>
-            <span class="qty-val">${s.quantity}</span>
-            <div class="qty-btn" onclick="changeLocQty(${item.id},${s.location_id},${s.quantity},+1)">+</div>
-          </div></td>
-          <td colspan="${colspan-4}"></td>
-          <td>${!empLocId?`<button class="btn btn-danger btn-sm" onclick="removeLocStock(${item.id},${s.location_id})">Remove</button>`:''}</td>
+          <td></td><td></td><td colspan="2" style="padding-left:2.5rem"><span class="loc-badge">📍 ${s.location_name||'Location #'+s.location_id}</span></td>
+          <td><span id="qty-${item.id}-${s.location_id}">${s.quantity}</span> <button class="btn btn-primary btn-sm" onclick="openAddRemovePanel(${item.id}, ${s.location_id})">Add/Remove</button></td>
+          <td colspan="${colspan-5}"></td>
         </tr>`;
       }
       // Only managers/admins can add to new locations
@@ -1202,21 +1290,19 @@ function renderInventory(){
         const used=stocks.map(s=>s.location_id);
         const avail=state.locations.filter(l=>!used.includes(l.id));
         if(avail.length){
-          const opts=avail.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
-          html+=`<tr class="tr-sub"><td></td><td colspan="${colspan-1}" style="padding-left:2.5rem">
-            <div class="flex gap1 items-center flex-wrap" style="padding:.4rem 0">
-              <span class="text-xs text-muted">Add to:</span>
-              <select class="inp" id="add-loc-sel-${item.id}" style="width:auto;padding:.3rem .65rem;font-size:.78rem"><option value="">— select —</option>${opts}</select>
-              <input type="number" class="inp" id="add-loc-qty-${item.id}" placeholder="Qty" style="width:70px;padding:.3rem .55rem;font-size:.78rem" value="0" min="0">
-              <button class="btn btn-success btn-sm" onclick="addToLoc(${item.id})">＋ Add</button>
-            </div></td></tr>`;
+          html+=`<tr class="tr-sub"><td></td><td></td><td colspan="${colspan-1}" style="padding-left:2.5rem;color:var(--text3);font-style:italic;font-size:.75rem">Use the Add/Remove button to manage stock at additional locations</td></tr>`;
         } else {
-          html+=`<tr class="tr-sub"><td></td><td colspan="${colspan-1}" style="padding-left:2.5rem;color:var(--text3);font-style:italic;font-size:.75rem">✓ All locations assigned</td></tr>`;
+          html+=`<tr class="tr-sub"><td></td><td colspan="${colspan-1}" style="padding-left:2.5rem;color:var(--text3);font-style:italic;font-size:.75rem">✓ All locations assigned — use Add/Remove to adjust quantities</td></tr>`;
         }
       }
     }
   }
   tbody.innerHTML=html;
+  }catch(e){
+    console.warn('Inventory render error:',e);
+    const tbody=$('inv-tbody');
+    if(tbody) tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:1rem;color:var(--red)">Error loading inventory</td></tr>';
+  }
 }
 
 /* Add item form */
@@ -1232,6 +1318,7 @@ $('btn-add-item').addEventListener('click',()=>{
     <div class="fg"><label class="lbl">Price</label><input class="inp" type="number" step="0.01" id="ni-price" value="0"></div>
     <div class="fg"><label class="lbl">Category</label><input class="inp" id="ni-cat"></div>
     <div class="fg"><label class="lbl">Initial Location</label><select class="inp" id="ni-loc"><option value="">None</option>${locOpts}</select></div>
+    <div class="fg"><label class="lbl">Picture/Icon</label><input class="inp" type="file" id="ni-pic" accept="image/*"></div>
   </div>
   <div class="flex gap2"><button class="btn btn-primary" id="ni-submit">Add Item</button><button class="btn btn-secondary" id="ni-cancel">Cancel</button></div></div>`;
   show('add-item-form');
@@ -1239,7 +1326,29 @@ $('btn-add-item').addEventListener('click',()=>{
   $('ni-submit').onclick=async()=>{
     const body={name:$('ni-name').value,sku:$('ni-sku').value,quantity:+$('ni-qty').value,min_quantity:+$('ni-min').value,price:+$('ni-price').value,category:$('ni-cat').value};
     if($('ni-loc').value) body.location_id=+$('ni-loc').value;
-    try{await A('/items',jbody('POST',body));hide('add-item-form');await loadItems();renderInventory();}
+    try{
+      const resp = await A('/items',jbody('POST',body));
+      const itemId = resp.id; // Assume response has id
+      // Upload picture if selected
+      const picFile = $('ni-pic').files[0];
+      if(picFile){
+        try{
+          const fd = new FormData();
+          fd.append('picture', picFile);
+          const picResp = await fetch(API+'/items/'+itemId+'/picture', {
+            method:'POST',
+            headers:{Authorization:'Bearer '+token()},
+            body:fd
+          });
+          if(!picResp.ok){
+            throw new Error('Picture upload failed');
+          }
+        }catch(err){
+          alert('Item added, but picture upload failed: '+err.message);
+        }
+      }
+      hide('add-item-form');await loadItems();renderInventory();
+    }
     catch(err){alert(err.message);}
   };
 });
@@ -1251,28 +1360,199 @@ async function toggleExpand(id){
   if(!state.stockCache[id]) await loadItemStocks(id);
   renderInventory();
 }
-async function changeItemQty(id,cur,delta){
-  try{await A('/items/'+id,jbody('PUT',{quantity:Math.max(0,cur+delta)}));await loadItems();renderInventory();}
-  catch(err){alert(err.message);}
-}
-async function changeLocQty(itemId,locId,cur,delta){
-  try{await A('/items/'+itemId+'/locations/'+locId,jbody('PUT',{quantity:Math.max(0,cur+delta)}));await loadItemStocks(itemId);await loadItems();renderInventory();}
-  catch(err){alert(err.message);}
-}
-async function removeLocStock(itemId,locId){
-  if(!confirm('Remove from this location?'))return;
-  try{await A('/items/'+itemId+'/locations/'+locId,{method:'DELETE'});await loadItemStocks(itemId);await loadItems();renderInventory();}
-  catch(err){alert(err.message);}
-}
-async function addToLoc(itemId){
-  const locId=+$('add-loc-sel-'+itemId).value, qty=+$('add-loc-qty-'+itemId).value||0;
-  if(!locId){alert('Select a warehouse');return;}
-  try{await A('/items/'+itemId+'/locations',jbody('POST',{location_id:locId,quantity:qty}));await loadItemStocks(itemId);await loadItems();renderInventory();}
-  catch(err){alert(err.message);}
+
+async function openAddRemovePanel(itemId, locId, defaultTab = 'add'){
+  const item = state.items.find(i => i.id === itemId);
+  if(!item) return;
+  
+  const isLocationSpecific = locId !== null;
+  const title = isLocationSpecific ? `📦 Manage Stock: ${item.name}` : `📦 Add/Remove: ${item.name}`;
+  $('ar-title').textContent = title;
+  
+  const locOpts = state.locations.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+  const currentQty = isLocationSpecific ? (state.stockCache[itemId]?.find(s => s.location_id === locId)?.quantity || 0) : item.quantity;
+  
+  if(isLocationSpecific){
+    // Location-specific modal with tabs
+    $('ar-body').innerHTML = `
+      <div style="padding:1.25rem">
+        <div style="background:rgba(30,41,59,.5);border-radius:10px;padding:1rem;margin-bottom:1.25rem;">
+          <div class="flex justify-between items-center">
+            <span class="text-sm fw6">Current Location Quantity</span>
+            <span class="fw7" style="color:var(--cyan)">${currentQty} units</span>
+          </div>
+        </div>
+        
+        <div class="tabs" style="margin-bottom:1rem">
+          <button class="tab-btn ${defaultTab === 'add' ? 'active' : ''}" data-tab="add">➕ Add Stock</button>
+          <button class="tab-btn ${defaultTab === 'remove' ? 'active' : ''}" data-tab="remove">➖ Remove Stock</button>
+          <button class="tab-btn ${defaultTab === 'delete' ? 'active' : ''}" data-tab="delete">🚫 Remove from Location</button>
+        </div>
+        
+        <div id="tab-add" class="tab-content ${defaultTab === 'add' ? '' : 'hidden'}">
+          <div class="fg">
+            <label class="lbl">Quantity to Add *</label>
+            <input class="inp" type="number" id="ar-add-qty" min="1" placeholder="Enter quantity to add">
+          </div>
+          <div style="display:flex;gap:.75rem;margin-top:1.25rem">
+            <button class="btn btn-success" id="ar-add-submit">Add Stock</button>
+            <button class="btn btn-secondary" onclick="hide('modal-add-remove')">Cancel</button>
+          </div>
+        </div>
+        
+        <div id="tab-remove" class="tab-content ${defaultTab === 'remove' ? '' : 'hidden'}">
+          <div class="fg">
+            <label class="lbl">Quantity to Remove *</label>
+            <input class="inp" type="number" id="ar-remove-qty" min="1" max="${currentQty}" placeholder="Enter quantity to remove">
+          </div>
+          <div style="display:flex;gap:.75rem;margin-top:1.25rem">
+            <button class="btn btn-danger" id="ar-remove-submit">Remove Stock</button>
+            <button class="btn btn-secondary" onclick="hide('modal-add-remove')">Cancel</button>
+          </div>
+        </div>
+        
+        <div id="tab-delete" class="tab-content ${defaultTab === 'delete' ? '' : 'hidden'}">
+          <div style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);border-radius:8px;padding:1rem;margin-bottom:1rem;">
+            <div class="fw6" style="color:var(--red);margin-bottom:.5rem">🚫 Remove from Location</div>
+            <div class="text-sm text-muted">This will remove all stock of "${item.name}" from this location. The item will still exist in other locations.</div>
+          </div>
+          <div style="display:flex;gap:.75rem;margin-top:1.25rem">
+            <button class="btn btn-danger" id="ar-delete-submit">Remove from Location</button>
+            <button class="btn btn-secondary" onclick="hide('modal-add-remove')">Cancel</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }else{
+    // Overall modal - show per-location management
+    if(!state.stockCache[itemId]) await loadItemStocks(itemId);
+    const stocks = state.stockCache[itemId] || [];
+    
+    $('ar-body').innerHTML = `
+      <div style="padding:1.25rem">
+        <div style="background:rgba(30,41,59,.5);border-radius:10px;padding:1rem;margin-bottom:1.25rem;">
+          <div class="flex justify-between items-center">
+            <span class="text-sm fw6">Total Quantity</span>
+            <span class="fw7" style="color:var(--cyan)">${currentQty} units</span>
+          </div>
+        </div>
+        
+        <div class="lbl" style="margin-bottom:.75rem">Manage Stock by Location</div>
+        ${stocks.length ? stocks.map(s => `
+          <div class="flex justify-between items-center" style="padding:.75rem 1rem;background:rgba(30,41,59,.3);border-radius:8px;margin-bottom:.5rem;">
+            <div>
+              <div class="fw6" style="color:var(--cyan2)">📍 ${s.location_name}</div>
+              <div class="text-sm text-muted">${s.quantity} units</div>
+            </div>
+            <div class="flex gap1">
+              <button class="btn btn-success btn-sm" onclick="openAddRemovePanel(${itemId}, ${s.location_id}, 'add')">➕ Add</button>
+              <button class="btn btn-amber btn-sm" onclick="openAddRemovePanel(${itemId}, ${s.location_id}, 'remove')">➖ Remove</button>
+            </div>
+          </div>
+        `).join('') : '<div class="text-sm text-muted" style="text-align:center;padding:1rem">No stock locations yet. Add stock to a location first.</div>'}
+        
+        <div class="flex gap2" style="margin-top:1.5rem;border-top:1px solid rgba(71,85,105,.3);padding-top:1rem">
+          <button class="btn btn-primary" onclick="openAddStockToNewLocation(${itemId})">➕ Add to New Location</button>
+          <button class="btn btn-danger" onclick="openDeleteItemModal(${itemId})">🗑️ Delete Item</button>
+          <button class="btn btn-secondary" onclick="hide('modal-add-remove')">Cancel</button>
+        </div>
+      </div>
+    `;
+  }
+  
+  // Tab switching
+  document.querySelectorAll('#ar-body .tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#ar-body .tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('#ar-body .tab-content').forEach(c => c.classList.add('hidden'));
+      btn.classList.add('active');
+      const tabEl = $('tab-' + btn.dataset.tab);
+      if(tabEl) tabEl.classList.remove('hidden');
+    });
+  });
+  
+  // Add stock
+  if($('ar-add-submit')) $('ar-add-submit').onclick = async () => {
+    const qty = parseInt($('ar-add-qty').value) || 0;
+    const loc = isLocationSpecific ? locId : parseInt($('ar-add-loc').value);
+    if(qty <= 0) return alert('Quantity must be at least 1');
+    if(!loc) return alert('Please select a location');
+    
+    try {
+      if(isLocationSpecific) {
+        const stock = state.stockCache[itemId]?.find(s => s.location_id === loc) || { quantity: 0 };
+        await A('/items/'+itemId+'/locations/'+loc, jbody('PUT', { quantity: stock.quantity + qty }));
+      } else {
+        await A('/items/'+itemId+'/locations', jbody('POST', { location_id: loc, quantity: qty }));
+      }
+      await Promise.all([loadItems(), loadItemStocks(itemId), loadAlerts()]);
+      renderInventory();
+      if(isMgr()) renderAlerts();
+      hide('modal-add-remove');
+      showToast('✅ Stock added successfully', 'success');
+    } catch(err) {
+      alert('Error: ' + err.message);
+    }
+  };
+  
+  // Remove stock
+  if($('ar-remove-submit')) $('ar-remove-submit').onclick = async () => {
+    const qty = parseInt($('ar-remove-qty').value) || 0;
+    const loc = isLocationSpecific ? locId : parseInt($('ar-remove-loc').value);
+    if(qty <= 0) return alert('Quantity must be at least 1');
+    if(!loc) return alert('Please select a location');
+    
+    try {
+      const stock = state.stockCache[itemId]?.find(s => s.location_id === loc);
+      if(!stock) return alert('No stock found at this location');
+      const newQty = Math.max(0, stock.quantity - qty);
+      await A('/items/'+itemId+'/locations/'+loc, jbody('PUT', { quantity: newQty }));
+      await Promise.all([loadItems(), loadItemStocks(itemId), loadAlerts()]);
+      renderInventory();
+      if(isMgr()) renderAlerts();
+      hide('modal-add-remove');
+      showToast('✅ Stock removed successfully', 'success');
+    } catch(err) {
+      alert('Error: ' + err.message);
+    }
+  };
+  
+  // Delete item
+  if($('ar-delete-submit')) $('ar-delete-submit').onclick = async () => {
+    const confirmMsg = isLocationSpecific 
+      ? `Are you sure you want to remove "${item.name}" from this location?`
+      : 'Are you sure you want to delete this item? This cannot be undone.';
+    if(!confirm(confirmMsg)) return;
+    try {
+      if(isLocationSpecific) {
+        // Remove from location
+        await A('/items/'+itemId+'/locations/'+locId, { method: 'DELETE' });
+        await Promise.all([loadItems(), loadItemStocks(itemId), loadAlerts()]);
+        renderInventory();
+        if(isMgr()) renderAlerts();
+        hide('modal-add-remove');
+        showToast('✅ Removed from location successfully', 'success');
+      } else {
+        // Delete entire item
+        await A('/items/'+itemId, { method: 'DELETE' });
+        if(state.expanded === itemId) state.expanded = null;
+        delete state.stockCache[itemId];
+        await Promise.all([loadItems(), loadAlerts()]);
+        renderInventory();
+        if(isMgr()) renderAlerts();
+        hide('modal-add-remove');
+        showToast('✅ Item deleted successfully', 'success');
+      }
+    } catch(err) {
+      alert('Error: ' + err.message);
+    }
+  };
+  
+  show('modal-add-remove');
 }
 async function deleteItem(id){
   if(!confirm('Delete this item?'))return;
-  try{await A('/items/'+id,{method:'DELETE'});if(state.expanded===id)state.expanded=null;delete state.stockCache[id];await loadItems();renderInventory();}
+  try{await A('/items/'+id,{method:'DELETE'});if(state.expanded===id)state.expanded=null;delete state.stockCache[id];await Promise.all([loadItems(),loadAlerts()]);renderInventory();if(isMgr())renderAlerts();}
   catch(err){alert(err.message);}
 }
 async function openEditItem(id){
@@ -1280,7 +1560,19 @@ async function openEditItem(id){
   if(!state.stockCache[id]) await loadItemStocks(id);
   const stocks=state.stockCache[id]||[];
   $('edit-item-title').textContent='✏️ Edit: '+item.name;
-  $('edit-item-body').innerHTML=`<div class="fgrid">
+  $('edit-item-body').innerHTML=`
+  <div style="text-align:center;margin-bottom:1.5rem">
+    <div style="background:rgba(30,41,59,.7);border:1px solid rgba(59,130,246,.17);border-radius:12px;padding:1.5rem;display:inline-block;margin-bottom:1rem">
+      <img id="ei-pic-preview" src="${item.picture_filename?'/api/items/'+id+'/picture?t='+Date.now():'/assets/pictures/placeholder.svg'}" 
+           alt="${item.name}" 
+           style="width:200px;height:200px;object-fit:cover;border-radius:8px;background:rgba(15,23,42,.6)">
+    </div>
+    <div>
+      <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin-bottom:.5rem">📷 Change Picture<input type="file" id="ei-pic-file" accept="image/*" style="display:none;"></label>
+      <div style="font-size:.72rem;color:var(--text3);margin-top:.35rem">Max 5MB • JPG, PNG, WebP supported</div>
+    </div>
+  </div>
+  <div class="fgrid">
     <div class="fg"><label class="lbl">Name *</label><input class="inp" id="ei-name" value="${item.name||''}"></div>
     <div class="fg"><label class="lbl">SKU</label><input class="inp" id="ei-sku" value="${item.sku||''}"></div>
     <div class="fg"><label class="lbl">Min Qty</label><input class="inp" type="number" id="ei-min" value="${item.min_quantity||0}"></div>
@@ -1290,41 +1582,147 @@ async function openEditItem(id){
   ${stocks.length?`<div class="lbl" style="margin:1rem 0 .65rem">Warehouse Quantities</div>
   ${stocks.map(s=>`<div class="flex gap2 items-center" style="padding:.65rem .75rem;background:rgba(30,41,59,.5);border-radius:8px;margin-bottom:.4rem">
     <span style="flex:1;color:var(--cyan2);font-weight:600;font-size:.835rem">📍 ${s.location_name}</span>
-    <div class="qty-ctrl">
-      <div class="qty-btn" onclick="changeLocQty(${id},${s.location_id},${s.quantity},-1);refreshEditModal(${id})">−</div>
-      <span class="qty-val" id="es-qty-${s.location_id}">${s.quantity}</span>
-      <div class="qty-btn" onclick="changeLocQty(${id},${s.location_id},${s.quantity},+1);refreshEditModal(${id})">+</div>
-    </div>
+    <span id="es-qty-${s.location_id}">${s.quantity}</span>
+    <button class="btn btn-primary btn-sm" onclick="openAddRemovePanel(${id}, ${s.location_id})">Add/Remove</button>
   </div>`).join('')}`:''}
   <div class="flex gap2" style="margin-top:1rem">
     <button class="btn btn-primary" onclick="saveEditItem(${id})">Save Changes</button>
+    <button class="btn btn-danger" onclick="deleteItem(${id})">🗑️ Delete Item</button>
     <button class="btn btn-secondary" onclick="hide('modal-edit-item')">Cancel</button>
   </div>`;
   show('modal-edit-item');
+  
+  // Picture upload handler
+  $('ei-pic-file').onchange=async(e)=>{
+    const file=e.target.files[0]; if(!file)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{ $('ei-pic-preview').src=ev.target.result; };
+    reader.readAsDataURL(file);
+    
+    // Auto-upload picture
+    try{
+      const fd=new FormData();
+      fd.append('picture',file);
+      console.log('Uploading item picture:', file.name, file.size, 'bytes');
+      const resp=await fetch(API+'/items/'+id+'/picture',{
+        method:'POST',
+        headers:{Authorization:'Bearer '+token()},
+        body:fd
+      });
+      console.log('Picture upload response:', resp.status);
+      if(!resp.ok){
+        const text=await resp.text();
+        console.error('Picture upload error:', resp.status, text);
+        throw new Error('Picture upload failed: '+resp.status+' '+text.substring(0,100));
+      }
+      console.log('Item picture uploaded successfully');
+      // Refresh preview with cache bust
+      setTimeout(()=>{ $('ei-pic-preview').src='/api/items/'+id+'/picture?t='+Date.now(); },300);
+    }catch(err){
+      console.error('Picture upload error:', err);
+      alert('Picture upload failed: '+err.message);
+    }
+  };
 }
 async function refreshEditModal(id){
-  await loadItemStocks(id); await loadItems();
+  await loadItemStocks(id);
   (state.stockCache[id]||[]).forEach(s=>{const el=$('es-qty-'+s.location_id);if(el)el.textContent=s.quantity;});
-  renderInventory();
 }
 async function saveEditItem(id){
   try{await A('/items/'+id,jbody('PUT',{name:$('ei-name').value,sku:$('ei-sku').value,min_quantity:+$('ei-min').value,price:+$('ei-price').value,category:$('ei-cat').value}));
-    hide('modal-edit-item');await loadItems();renderInventory();}
+    hide('modal-edit-item');await Promise.all([loadItems(),loadAlerts()]);renderInventory();if(isMgr())renderAlerts();}
   catch(err){alert(err.message);}
+}
+
+async function deleteItem(id){
+  const item = state.items.find(i => i.id === id);
+  if(!item) return;
+  if(!confirm(`Are you sure you want to delete "${item.name}"? This cannot be undone.`)) return;
+  try{
+    await A('/items/'+id, {method: 'DELETE'});
+    if(state.expanded === id) state.expanded = null;
+    delete state.stockCache[id];
+    await Promise.all([loadItems(), loadAlerts()]);
+    renderInventory();
+    if(isMgr()) renderAlerts();
+    hide('modal-add-remove');
+    showToast('✅ Item deleted successfully', 'success');
+  }catch(err){alert('Delete failed: '+err.message);}
+}
+
+function openDeleteItemModal(id){
+  deleteItem(id);
+}
+
+function showAddNewLocationForm(itemId){
+  const item = state.items.find(i => i.id === itemId);
+  if(!item) return;
+  const locOpts = state.locations.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+  $('ar-title').textContent = `🏭 Add Stock to New Location: ${item.name}`;
+  $('ar-body').innerHTML = `
+    <div style="padding:1.25rem">
+      <div class="fg">
+        <label class="lbl">Select Location *</label>
+        <select class="inp" id="newloc-loc" style="width:100%">
+          <option value="">— Select Location —</option>
+          ${locOpts}
+        </select>
+      </div>
+      <div class="fg">
+        <label class="lbl">Quantity to Add *</label>
+        <input class="inp" type="number" id="newloc-qty" min="1" placeholder="Enter quantity" style="width:100%">
+      </div>
+      <div style="display:flex;gap:.75rem;margin-top:1.5rem">
+        <button class="btn btn-success" id="newloc-submit">✅ Add Stock</button>
+        <button class="btn btn-secondary" onclick="hide('modal-add-remove')">Cancel</button>
+      </div>
+    </div>
+  `;
+  $('newloc-submit').onclick = async () => {
+    const loc = parseInt($('newloc-loc').value);
+    const qty = parseInt($('newloc-qty').value);
+    if(!loc) return alert('Please select a location');
+    if(qty <= 0) return alert('Quantity must be at least 1');
+    try {
+      await A('/items/'+itemId+'/locations', jbody('POST', {location_id: loc, quantity: qty}));
+      await Promise.all([loadItems(), loadItemStocks(itemId), loadAlerts()]);
+      renderInventory();
+      if(isMgr()) renderAlerts();
+      hide('modal-add-remove');
+      showToast('✅ Stock added to new location successfully', 'success');
+    } catch(err) {
+      alert('Error adding stock: ' + err.message);
+    }
+  };
+  show('modal-add-remove');
+}
+
+function openAddStockToNewLocation(id){
+  showAddNewLocationForm(id);
 }
 
 /* ═══════════════════════════════════════════════
    LOCATIONS (with Edit + Delete)
 ═══════════════════════════════════════════════ */
 function renderLocations(){
-  $('loc-tbody').innerHTML=state.locations.map(l=>`
-    <tr>
-      <td>${l.id}</td><td><b>${l.name}</b></td><td>${l.address||'—'}</td><td>${fmtDate(l.created_at)}</td>
-      <td><div class="flex gap1">
-        <button class="btn btn-amber btn-sm" onclick="openEditLoc(${l.id},'${(l.name||'').replace(/'/g,"\\'")}','${(l.address||'').replace(/'/g,"\\'")}')">✏️ Edit</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteLoc(${l.id},'${(l.name||'').replace(/'/g,"\\'")}')">🗑️</button>
-      </div></td>
-    </tr>`).join('');
+  try{
+    if(!state.locations||!Array.isArray(state.locations)){
+      $('loc-tbody').innerHTML='<tr><td colspan="5" style="text-align:center;padding:1rem;color:var(--text3)">No locations available</td></tr>';
+      return;
+    }
+    $('loc-tbody').innerHTML=state.locations.map(l=>`
+      <tr>
+        <td>${l.id}</td><td><b>${l.name}</b></td><td>${l.address||'—'}</td><td>${fmtDate(l.created_at)}</td>
+        <td><div class="flex gap1">
+          <button class="btn btn-amber btn-sm" onclick="openEditLoc(${l.id},'${(l.name||'').replace(/'/g,"\\'")}','${(l.address||'').replace(/'/g,"\\'")}')">✏️ Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteLoc(${l.id},'${(l.name||'').replace(/'/g,"\\'")}')">🗑️</button>
+        </div></td>
+      </tr>`).join('');
+  }catch(e){
+    console.warn('Locations render error:',e);
+    const tbody=$('loc-tbody');
+    if(tbody) tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:1rem;color:var(--red)">Error loading locations</td></tr>';
+  }
 }
 
 $('btn-add-loc').addEventListener('click',()=>{
@@ -1379,30 +1777,42 @@ async function renderContacts(){
    USERS — Admin: full edit/delete | Manager: view only
 ═══════════════════════════════════════════════ */
 async function renderUsers(){
-  const data=await A('/users').catch(()=>[]);
-  const users=Array.isArray(data)?data:[];
-  const admin=isAdmin();
+  try{
+    const data=await A('/users').catch(()=>[]);
+    const users=Array.isArray(data)?data:[];
+    const admin=isAdmin();
 
-  $('users-sub').textContent=admin?'Full access — edit and delete users':'Read-only — contact an admin to make changes';
-  $('users-act-th').textContent=admin?'Actions':'';
+    const usersSub=$('users-sub');
+    if(usersSub) usersSub.textContent=admin?'Full access — edit and delete users':'Read-only — contact an admin to make changes';
+    
+    const usersActTh=$('users-act-th');
+    if(usersActTh) usersActTh.textContent=admin?'Actions':'';
 
-  // Add user button — admin only
-  if(admin) show('users-add-wrap'); else hide('users-add-wrap');
+    // Add user button — admin only
+    if(admin) show('users-add-wrap'); else hide('users-add-wrap');
 
-  $('users-tbody').innerHTML=users.map(u=>`
-    <tr>
-      <td style="font-family:monospace;font-size:.78rem">${u.username}</td>
-      <td><b>${u.full_name}</b></td>
-      <td class="text-sm">${u.email||'—'}</td>
-      <td style="color:var(--cyan);font-weight:600">${u.phone||'—'}</td>
-      <td><span class="badge ${u.role==='admin'?'badge-danger':u.role==='manager'?'badge-info':'badge-success'}">${u.role}</span></td>
-      <td>${u.location_name||'—'}</td>
-      <td class="text-sm">${fmtDate(u.last_login)}</td>
-      <td>${admin?`<div class="flex gap1">
-        <button class="btn btn-amber btn-sm" onclick="openEditUser(${u.id})">✏️</button>
-        ${u.id!==state.user.id?`<button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id},'${(u.username||'').replace(/'/g,"\\'")}')">🗑️</button>`:'<span class="text-xs text-muted">(you)</span>'}
-      </div>`:''}</td>
-    </tr>`).join('');
+    const tbody=$('users-tbody');
+    if(!tbody) return;
+    
+    tbody.innerHTML=users.map(u=>`
+      <tr>
+        <td style="font-family:monospace;font-size:.78rem">${u.username}</td>
+        <td><b>${u.full_name}</b></td>
+        <td class="text-sm">${u.email||'—'}</td>
+        <td style="color:var(--cyan);font-weight:600">${u.phone||'—'}</td>
+        <td><span class="badge ${u.role==='admin'?'badge-danger':u.role==='manager'?'badge-info':'badge-success'}">${u.role}</span></td>
+        <td>${u.location_name||'—'}</td>
+        <td class="text-sm">${fmtDate(u.last_login)}</td>
+        <td>${admin?`<div class="flex gap1">
+          <button class="btn btn-amber btn-sm" onclick="openEditUser(${u.id})">✏️</button>
+          ${u.id!==state.user.id?`<button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id},'${(u.username||'').replace(/'/g,"\\'")}')">🗑️</button>`:'<span class="text-xs text-muted">(you)</span>'}
+        </div>`:''}</td>
+      </tr>`).join('');
+  }catch(e){
+    console.warn('Users render error:',e);
+    const tbody=$('users-tbody');
+    if(tbody) tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:1rem;color:var(--red)">Error loading users</td></tr>';
+  }
 }
 
 $('btn-add-user').addEventListener('click',()=>{
@@ -1496,7 +1906,7 @@ async function loadLogs(){
   hide('report-err');
   $('log-list').innerHTML='<div class="spinner-wrap"><div class="spinner"></div></div>';
   try{
-    const data=await AR('/reports/activity-log?days='+days);
+    const data=await AR('/activity-log?days='+days);
     state.logCache=data.log_entries||[];
     if(!state.logCache.length){$('log-list').innerHTML='<div style="text-align:center;padding:2rem;color:var(--text3)">No activity in this period</div>';return;}
     renderLogList(state.logCache);
@@ -1528,7 +1938,7 @@ function renderLogList(logs){
 
 async function loadPdfPreview(){
   try{
-    const d=await AR('/reports/comprehensive');
+    const d=await AR('/comprehensive');
     const inv=d.inventory_overview||{},al=d.alerts_overview||{},us=d.users_overview||{};
     $('pdf-preview').innerHTML=[
       ['📦 SKUs',inv.total_items||'—'],['🔔 Alerts',al.active||'—'],
@@ -1593,7 +2003,7 @@ async function generateComprehensivePDF(){
     await ensureJsPDF();
     const {jsPDF}=window.jspdf;
     const doc=new jsPDF();
-    const pd=window._rprtData||(await AR('/reports/comprehensive').catch(()=>null));
+    const pd=window._rprtData||(await AR('/comprehensive').catch(()=>null));
 
     doc.setFillColor(10,14,39); doc.rect(0,0,210,36,'F');
     doc.setTextColor(96,165,250); doc.setFontSize(17); doc.setFont('helvetica','bold');
@@ -1648,7 +2058,11 @@ function loadScript(src){
 /* ═══════════ SETTINGS ═══════════ */
 function renderSettings(){
   const u=state.user;
-  $('settings-avatar').textContent=initials(u.full_name);
+  const settingsAvatar=$('settings-avatar');
+  
+  // Always show initials
+  settingsAvatar.textContent=initials(u.full_name);
+  
   $('settings-fields').innerHTML=`
     <div class="fg"><label class="lbl">Full Name</label><input class="inp" id="sf-name" value="${u.full_name||''}"></div>
     <div class="fg"><label class="lbl">Email</label><input class="inp" type="email" id="sf-email" value="${u.email||''}"></div>
@@ -1658,25 +2072,48 @@ function renderSettings(){
     ${u.location_name?`<div class="fg"><label class="lbl">Location</label><input class="inp" value="${u.location_name}" disabled></div>`:''}
     <div class="fg"><label class="lbl">New Password</label><input class="inp" type="password" id="sf-pass" placeholder="Leave blank to keep"></div>
     <div class="fg"><label class="lbl">Confirm Password</label><input class="inp" type="password" id="sf-conf"></div>`;
-  $('photo-file').onchange=e=>{
-    const f=e.target.files[0]; if(!f) return;
-    const r=new FileReader(); r.onload=ev=>{ $('settings-avatar').innerHTML=`<img src="${ev.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`; }; r.readAsDataURL(f);
-  };
   $('btn-save-settings').onclick=async()=>{
     const pass=$('sf-pass').value, conf=$('sf-conf').value;
     if(pass&&pass!==conf){alert('Passwords do not match');return;}
     const body={full_name:$('sf-name').value,email:$('sf-email').value,phone:$('sf-phone').value};
     if(pass) body.password=pass;
     try{
+      // Save user profile data
       await A('/users/'+u.id,jbody('PUT',body));
-      const ph=$('photo-file').files[0];
-      if(ph){const fd=new FormData();fd.append('photo',ph);await fetch(API+'/users/'+u.id+'/photo',{method:'POST',headers:{Authorization:'Bearer '+token()},body:fd});}
-      alert('Settings saved!'); $('sf-pass').value=''; $('sf-conf').value='';
-    }catch(err){alert(err.message);}
+      
+      alert('Settings saved!'); 
+      $('sf-pass').value=''; 
+      $('sf-conf').value=''; 
+      
+      // Refresh user data and UI
+      try {
+        const userData = await A('/auth/me');
+        state.user = userData;
+        localStorage.setItem('user', JSON.stringify(userData));
+        buildSidebar(); // Refresh sidebar
+        renderSettings();
+      } catch (err) {
+        console.warn('Failed to refresh user data:', err);
+        renderSettings();
+      }
+    }catch(err){
+      console.error('Settings save error:', err);
+      alert('Error: '+err.message);
+    }
   };
 }
 
 /* ═══════════ BOOT ═══════════ */
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+
 (function boot(){
   if(typeof Chart==='undefined'){
     loadScript('https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js').then(resume).catch(resume);
