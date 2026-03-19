@@ -48,6 +48,8 @@ CREATE TABLE items (
     price        DECIMAL(10,2) DEFAULT 0.00,
     category     VARCHAR(100),
     location_id  INTEGER REFERENCES locations(id),  -- legacy / primary location
+    picture      BYTEA,
+    picture_filename VARCHAR(255),
     created_at   TIMESTAMP DEFAULT NOW(),
     updated_at   TIMESTAMP DEFAULT NOW()
 );

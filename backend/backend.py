@@ -65,6 +65,7 @@ def init_db():
         min_quantity INTEGER NOT NULL DEFAULT 10,
         price DECIMAL(10,2) DEFAULT 0.00, category VARCHAR(100),
         location_id INTEGER REFERENCES locations(id),
+        picture BYTEA, picture_filename VARCHAR(255),
         created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW())''')
 
     # ── NEW: multi-warehouse stock table ──────────────────────────────────────
@@ -233,6 +234,27 @@ def update_location(uid, role, loc, lid):
     conn.commit(); cur.close(); conn.close()
     return jsonify({'message': 'Updated'}), 200
 
+@app.route('/locations/<int:lid>', methods=['DELETE'])
+@manager_required
+def delete_location(uid, role, loc, lid):
+    conn = get_db(); cur = conn.cursor()
+    # Check if location has any items
+    cur.execute('SELECT COUNT(*) FROM item_locations WHERE location_id = %s', (lid,))
+    count = cur.fetchone()[0]
+    if count > 0:
+        cur.close(); conn.close()
+        return jsonify({'error': 'Cannot delete location with items. Please move or remove all items first.'}), 400
+    # Check if any users are assigned to this location
+    cur.execute('SELECT COUNT(*) FROM users WHERE location_id = %s', (lid,))
+    user_count = cur.fetchone()[0]
+    if user_count > 0:
+        cur.close(); conn.close()
+        return jsonify({'error': 'Cannot delete location with assigned users. Please reassign users first.'}), 400
+    # Safe to delete
+    cur.execute('DELETE FROM locations WHERE id = %s', (lid,))
+    conn.commit(); cur.close(); conn.close()
+    return jsonify({'message': 'Location deleted'}), 200
+
 # ═════════════════════════════════════════════════════════════════════════════
 # USERS
 # ═════════════════════════════════════════════════════════════════════════════
@@ -363,6 +385,39 @@ def get_photo(target_id):
                      as_attachment=False, download_name=row[1] or 'photo.jpg')
 
 # ═════════════════════════════════════════════════════════════════════════════
+# ITEM PICTURES
+# ═════════════════════════════════════════════════════════════════════════════
+@app.route('/items/<int:item_id>/picture', methods=['POST'])
+@token_required
+def upload_item_picture(uid, role, loc, item_id):
+    if 'picture' not in request.files:
+        return jsonify({'error': 'No picture file provided'}), 400
+
+    conn = get_db(); cur = conn.cursor()
+    cur.execute('SELECT id FROM items WHERE id=%s', (item_id,))
+    if not cur.fetchone():
+        cur.close(); conn.close()
+        return jsonify({'error': 'Item not found'}), 404
+
+    file = request.files['picture']
+    data = file.read()
+    cur.execute('UPDATE items SET picture=%s, picture_filename=%s WHERE id=%s',
+                (psycopg2.Binary(data), file.filename, item_id))
+    log_activity(cur, uid, 'Item picture uploaded', f'Item {item_id}: {file.filename}')
+    conn.commit(); cur.close(); conn.close()
+    return jsonify({'message': 'Picture uploaded'}), 200
+
+@app.route('/items/<int:item_id>/picture', methods=['GET'])
+def get_item_picture(item_id):
+    conn = get_db(); cur = conn.cursor()
+    cur.execute('SELECT picture, picture_filename FROM items WHERE id=%s', (item_id,))
+    row = cur.fetchone(); cur.close(); conn.close()
+    if not row or not row[0]:
+        return jsonify({'error': 'No picture'}), 404
+    return send_file(io.BytesIO(bytes(row[0])), mimetype='image/jpeg',
+                     as_attachment=False, download_name=row[1] or f'item_{item_id}.jpg')
+
+# ═════════════════════════════════════════════════════════════════════════════
 # CONTACTS
 # ═════════════════════════════════════════════════════════════════════════════
 @app.route('/contacts', methods=['GET'])
@@ -384,14 +439,19 @@ def get_contacts(uid, role, loc):
 @token_required
 def get_items(uid, role, loc):
     conn = get_db(); cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    # Explicitly list columns to avoid returning binary picture data (memoryview) in JSON
+    select_cols = (
+        'i.id, i.name, i.sku, i.quantity, i.min_quantity, i.price, '
+        'i.category, i.location_id, i.picture_filename, l.name as location_name'
+    )
+    total_qty = (
+        'COALESCE((SELECT SUM(il.quantity) FROM item_locations il WHERE il.item_id = i.id), i.quantity) AS total_quantity'
+    )
+
     if role == 'employee' and loc:
         # Employees see items that exist in their location (via item_locations or legacy location_id)
-        cur.execute('''
-            SELECT DISTINCT i.*, l.name as location_name,
-                   COALESCE(
-                     (SELECT SUM(il.quantity) FROM item_locations il WHERE il.item_id = i.id),
-                     i.quantity
-                   ) as total_quantity
+        cur.execute(f'''
+            SELECT DISTINCT {select_cols}, {total_qty}
             FROM items i
             LEFT JOIN locations l ON i.location_id = l.id
             WHERE i.location_id = %s
@@ -399,12 +459,8 @@ def get_items(uid, role, loc):
             ORDER BY i.name
         ''', (loc, loc))
     else:
-        cur.execute('''
-            SELECT i.*, l.name as location_name,
-                   COALESCE(
-                     (SELECT SUM(il.quantity) FROM item_locations il WHERE il.item_id = i.id),
-                     i.quantity
-                   ) as total_quantity
+        cur.execute(f'''
+            SELECT {select_cols}, {total_qty}
             FROM items i
             LEFT JOIN locations l ON i.location_id = l.id
             ORDER BY i.name
@@ -433,9 +489,11 @@ def add_item(uid, role, loc):
         item_id = cur.fetchone()[0]
 
         # Seed item_locations if we have a location
-        if item_loc and qty > 0:
+        if item_loc:
             cur.execute('INSERT INTO item_locations (item_id,location_id,quantity) VALUES (%s,%s,%s)',
                         (item_id, item_loc, qty))
+            # Sync items.quantity from item_locations to ensure consistency
+            _sync_item_total(cur, item_id)
 
         log_activity(cur, uid, 'Item added', f"Added: {data['name']}")
         conn.commit()
@@ -469,9 +527,12 @@ def update_item(uid, role, loc, item_id):
         if field in data:
             updates.append(f'{field}=%s'); vals.append(data[field])
 
+    qty_changed = False
+    new_qty = None
     if 'quantity' in data:
         new_qty = max(0, int(data['quantity']))
         updates.append('quantity=%s'); vals.append(new_qty)
+        qty_changed = True
 
     if role in ('admin','manager') and 'location_id' in data:
         updates.append('location_id=%s'); vals.append(data['location_id'])
@@ -484,6 +545,17 @@ def update_item(uid, role, loc, item_id):
     vals.append(item_id)
     cur.execute(f"UPDATE items SET {','.join(updates)} WHERE id=%s", vals)
     log_activity(cur, uid, 'Item updated', f'Updated item ID: {item_id}')
+    
+    # If quantity was changed directly and item has a primary location, update item_locations
+    if qty_changed and new_qty is not None and item['location_id']:
+        cur.execute('''INSERT INTO item_locations (item_id, location_id, quantity)
+                       VALUES (%s, %s, %s)
+                       ON CONFLICT (item_id, location_id) DO UPDATE SET quantity = %s, updated_at = NOW()''',
+                    (item_id, item['location_id'], new_qty, new_qty))
+    
+    # Sync items.quantity from item_locations to ensure consistency
+    _sync_item_total(cur, item_id)
+    
     conn.commit()
 
     cur.execute('SELECT name,quantity,min_quantity FROM items WHERE id=%s', (item_id,))
@@ -615,8 +687,14 @@ def remove_item_from_location(uid, role, loc, item_id, location_id):
 
 def _sync_item_total(cur, item_id):
     """Keep items.quantity = SUM of item_locations.quantity."""
-    cur.execute('SELECT COALESCE(SUM(quantity),0) FROM item_locations WHERE item_id=%s', (item_id,))
-    total = cur.fetchone()[0]
+    cur.execute('SELECT COALESCE(SUM(quantity),0) AS total FROM item_locations WHERE item_id=%s', (item_id,))
+    row = cur.fetchone()
+    if row is None:
+        total = 0
+    elif isinstance(row, dict):
+        total = row.get('total', 0)
+    else:
+        total = row[0]
     cur.execute('UPDATE items SET quantity=%s, updated_at=NOW() WHERE id=%s', (total, item_id))
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -634,7 +712,7 @@ def get_summary(uid, role, loc):
     cur.execute(f'SELECT COUNT(*) as c FROM items i {where}', params)
     total_items = cur.fetchone()['c']
 
-    cur.execute(f'SELECT COUNT(*) as c FROM items i {where} {and_kw} quantity < min_quantity', params)
+    cur.execute(f'SELECT COUNT(*) as c FROM items i {where} {and_kw} quantity > 0 AND quantity < min_quantity', params)
     low_stock = cur.fetchone()['c']
 
     cur.execute(f'SELECT COUNT(*) as c FROM items i {where} {and_kw} quantity = 0', params)
