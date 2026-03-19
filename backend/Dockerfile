@@ -9,8 +9,7 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 
 COPY . .
 
-RUN chmod +x wait-for-db.sh
-
 EXPOSE 5000
 
-ENTRYPOINT ["./wait-for-db.sh"]
+# Run the Flask backend
+CMD ["python", "backend.py"]

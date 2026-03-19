@@ -9,8 +9,7 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 
 COPY . .
 
-RUN chmod +x wait-for-db.sh
-
 EXPOSE 5001
 
-ENTRYPOINT ["./wait-for-db.sh"]
+# Run the Flask alert microservice
+CMD ["python", "alert_microservice.py"]
