@@ -1,2 +1,56 @@
 .env
+.env.ci
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual Environments
+venv/
+env/
+.venv
+
+# Testing and Coverage
+test-results/
+coverage/
+.coverage
+*.xml
+.pytest_cache/
+htmlcov/
+integration-test.log
+integration-test-report.json
+summary.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Docker
+.docker-buildkit
+docker-compose.override.yml
+
+# CI/CD
+Jenkinsfile.local
+.jenkins/
+pipeline.log
+
+# Temporary files
+*.tmp
+*.bak
+.temp/
+node_modules/
