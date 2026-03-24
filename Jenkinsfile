@@ -15,14 +15,19 @@ pipeline {
                 sh '''
                     mkdir -p ${TEST_RESULTS_DIR}
 
-                    # IDEAL: create venv and install dependencies there
+                    # Try virtual env (preferred)
                     if python3 -m venv ci_env 2>/tmp/venv-init.log; then
                         . ci_env/bin/activate
                         pip install --upgrade pip setuptools wheel requests
                         deactivate
                     else
-                        echo "venv creation failed, falling back to user installs"
-                        python3 -m pip install --upgrade pip setuptools wheel requests --user
+                        echo "venv creation failed, using isolated project install"
+
+                        # Install packages into project-local folder (no system site-packages)
+                        python3 -m pip install --upgrade pip setuptools wheel requests --target ./ci_env_lib --break-system-packages
+
+                        # Use project-local packages at runtime
+                        export PYTHONPATH="$PWD/ci_env_lib:$PYTHONPATH"
                     fi
                 '''
             }
