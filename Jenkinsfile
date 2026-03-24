@@ -14,6 +14,10 @@ pipeline {
             steps {
                 sh '''
                     mkdir -p ${TEST_RESULTS_DIR}
+                    
+                    # Install python3-venv if not available
+                    apt update && apt install -y python3-venv || true
+                    
                     python3 -m venv ci_env
                     . ci_env/bin/activate
                     pip install --upgrade pip setuptools wheel requests
