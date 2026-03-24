@@ -32,6 +32,9 @@ services:
         condition: service_started
     ports:
       - "5000:5000"
+    volumes:
+      - ./backend/test_backend.py:/app/test_backend.py:ro
+      - ./backend/conftest.py:/app/conftest.py:ro
     restart: unless-stopped
 
   alert_service:
