@@ -167,6 +167,9 @@ pipeline {
                     // Archive artifacts
                     archiveArtifacts artifacts: 'test-results/**/*.xml,coverage/**/*.xml', 
                                      allowEmptyArchive: true
+                }
+            }
+        }
         
         stage('Cleanup Test Artifacts') {
             steps {
@@ -433,3 +436,5 @@ EOF
         }
     }
 }
+
+
