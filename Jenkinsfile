@@ -14,14 +14,16 @@ pipeline {
             steps {
                 sh '''
                     mkdir -p ${TEST_RESULTS_DIR}
-                    
-                    # Install python3-venv if not available
-                    apt update && apt install -y python3-venv || true
-                    
-                    python3 -m venv ci_env
-                    . ci_env/bin/activate
-                    pip install --upgrade pip setuptools wheel requests
-                    deactivate
+
+                    # IDEAL: create venv and install dependencies there
+                    if python3 -m venv ci_env 2>/tmp/venv-init.log; then
+                        . ci_env/bin/activate
+                        pip install --upgrade pip setuptools wheel requests
+                        deactivate
+                    else
+                        echo "venv creation failed, falling back to user installs"
+                        python3 -m pip install --upgrade pip setuptools wheel requests --user
+                    fi
                 '''
             }
         }
