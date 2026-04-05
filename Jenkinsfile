@@ -15,16 +15,10 @@ pipeline {
                 sh '''
                     mkdir -p ${TEST_RESULTS_DIR}
 
-                    # Ensure Git is installed
-                    if ! command -v git >/dev/null; then
-                        echo "Git not found, installing..."
-                        apt-get update && apt-get install -y git
-                    fi
-
                     # Ensure Python venv package is installed
                     apt-get update && apt-get install -y python3.12-venv
 
-                    # Try virtual env (preferred)
+                    # Try virtual env
                     if python3 -m venv ci_env; then
                         . ci_env/bin/activate
                         pip install --upgrade pip setuptools wheel requests
@@ -43,9 +37,6 @@ pipeline {
                 sh '''
                     # Clean up any existing containers and volumes
                     docker-compose down -v || true
-
-                    # Remove conflicting container if exists
-                    docker rm -f Our_DB || true
                     
                     # Build and start services
                     docker-compose up --build -d
@@ -105,27 +96,6 @@ EOF
                 '''
             }
         }
-        
-        stage('Deploy to Staging') {
-            when { expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' } }
-            input { message "Deploy to staging?" }
-            steps {
-                sh '''
-                    tar -xzf "inventory-app-${BUILD_NUMBER}.tar.gz"
-                    cd deployment
-                    docker-compose down -v || true
-                    docker rm -f Our_DB || true
-                    docker-compose up -d
-                    sleep 10
-                    
-                    for i in {1..5}; do
-                        curl -f ${BACKEND_URL}/health && break
-                        [ $i -eq 5 ] && exit 1
-                        sleep 5
-                    done
-                '''
-            }
-        }
     }
     
     post {
@@ -140,8 +110,6 @@ EOF
         cleanup {
             sh '''
                 docker-compose down -v || true
-                docker rm -f Our_DB || true
-                docker image prune -f || true
                 rm -rf ci_env deployment __pycache__ *.pyc .pytest_cache || true
             '''
         }
