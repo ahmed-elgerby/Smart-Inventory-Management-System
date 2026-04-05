@@ -15,18 +15,23 @@ pipeline {
                 sh '''
                     mkdir -p ${TEST_RESULTS_DIR}
 
+                    # Ensure Git is installed
+                    if ! command -v git >/dev/null; then
+                        echo "Git not found, installing..."
+                        apt-get update && apt-get install -y git
+                    fi
+
+                    # Ensure Python venv package is installed
+                    apt-get update && apt-get install -y python3.12-venv
+
                     # Try virtual env (preferred)
-                    if python3 -m venv ci_env 2>/tmp/venv-init.log; then
+                    if python3 -m venv ci_env; then
                         . ci_env/bin/activate
                         pip install --upgrade pip setuptools wheel requests
                         deactivate
                     else
                         echo "venv creation failed, using isolated project install"
-
-                        # Install packages into project-local folder (no system site-packages)
                         python3 -m pip install --upgrade pip setuptools wheel requests --target ./ci_env_lib --break-system-packages
-
-                        # Use project-local packages at runtime
                         export PYTHONPATH="$PWD/ci_env_lib:$PYTHONPATH"
                     fi
                 '''
@@ -36,7 +41,13 @@ pipeline {
         stage('Build & Test Services') {
             steps {
                 sh '''
-                    #building and starting services via docker-compose
+                    # Clean up any existing containers and volumes
+                    docker-compose down -v || true
+
+                    # Remove conflicting container if exists
+                    docker rm -f Our_DB || true
+                    
+                    # Build and start services
                     docker-compose up --build -d
                     sleep 5
                     
@@ -50,21 +61,16 @@ pipeline {
                         sleep 2
                     done
                     
-                    # Run unit tests for each service
+                    # Run unit tests
                     echo "Running unit tests..."
-                    
-                    # Backend tests
                     docker-compose exec -T backend pytest -v --tb=short || exit 1
-                    
-                    # Alert service tests  
                     docker-compose exec -T alert-service pytest -v --tb=short || exit 1
-                    
-                    # Reporting service tests
                     docker-compose exec -T reporting-service pytest -v --tb=short || exit 1
                     
                     # Integration tests
                     . ci_env/bin/activate
                     python3 integration_tests.py
+                    deactivate
                 '''
             }
         }
@@ -95,6 +101,7 @@ EOF
                     tar -xzf "inventory-app-${BUILD_NUMBER}.tar.gz"
                     cd deployment
                     docker-compose down -v || true
+                    docker rm -f Our_DB || true
                     docker-compose up -d
                     sleep 10
                     
@@ -120,11 +127,10 @@ EOF
         cleanup {
             sh '''
                 docker-compose down -v || true
+                docker rm -f Our_DB || true
                 docker image prune -f || true
                 rm -rf ci_env deployment __pycache__ *.pyc .pytest_cache || true
             '''
         }
     }
 }
-
-
