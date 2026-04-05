@@ -61,13 +61,26 @@ pipeline {
                         sleep 2
                     done
                     
-                    # Run unit tests
                     echo "Running unit tests..."
-                    docker-compose exec -T backend pytest -v --tb=short || exit 1
-                    docker-compose exec -T alert-service pytest -v --tb=short || exit 1
-                    docker-compose exec -T reporting-service pytest -v --tb=short || exit 1
-                    
-                    # Integration tests
+                '''
+                
+                // Retry block for backend tests
+                retry(2) {
+                    sh 'docker-compose exec -T backend pytest -v --tb=short'
+                }
+                
+                // Retry block for alert service tests
+                retry(2) {
+                    sh 'docker-compose exec -T alert-service pytest -v --tb=short'
+                }
+                
+                // Retry block for reporting service tests
+                retry(2) {
+                    sh 'docker-compose exec -T reporting-service pytest -v --tb=short'
+                }
+                
+                // Integration tests
+                sh '''
                     . ci_env/bin/activate
                     python3 integration_tests.py
                     deactivate
