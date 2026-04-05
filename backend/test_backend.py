@@ -13,7 +13,7 @@ def test_login_success(test_client):
     """Test successful login"""
     response = test_client.post('/auth/login', json={
         'username': 'testadmin',
-        'password': 'admin123'
+        'password': 'password'
     })
     assert response.status_code == 200
     data = response.get_json()
