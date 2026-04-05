@@ -2,9 +2,10 @@ import pytest
 import psycopg2
 import os
 from dotenv import load_dotenv
-from werkzeug.security import generate_password_hash
 
 load_dotenv()
+
+import alert_service
 
 @pytest.fixture(scope='session')
 def test_db():
@@ -67,15 +68,22 @@ def test_db():
     yield test_conn
     test_conn.close()
 
-@pytest.fixture
-def test_client(test_db):
-    """Create a test client for the alert service"""
-    from alert_microservice import app
+@pytest.fixture(autouse=True)
+def reset_alerts(test_db):
+    """Reset alerts before every alert-service test"""
+    cur = test_db.cursor()
+    try:
+        cur.execute('DELETE FROM alerts')
+        cur.execute('ALTER SEQUENCE alerts_id_seq RESTART WITH 1')
+        test_db.commit()
+    finally:
+        cur.close()
+    yield
 
-    # Monkey patch the database connection
-    import alert_service
-    original_get_db = alert_service.get_db_connection
-    def mock_get_db():
+@pytest.fixture(autouse=True)
+def patch_alert_service_db(test_db, monkeypatch):
+    """Patch alert_service to use the test database for all tests"""
+    def mock_get_db_connection():
         return psycopg2.connect(
             host=os.getenv('DB_HOST', 'localhost'),
             database='inventory_test',
@@ -83,10 +91,13 @@ def test_client(test_db):
             password=os.getenv('DB_PASSWORD', 'postgres'),
             port=os.getenv('DB_PORT', 5432),
         )
-    alert_service.get_db_connection = mock_get_db
+    monkeypatch.setattr(alert_service, 'get_db_connection', mock_get_db_connection)
+    yield
+
+@pytest.fixture
+def test_client(test_db):
+    """Create a test client for the alert service"""
+    from alert_microservice import app
 
     with app.test_client() as client:
         yield client
-
-    # Restore original
-    alert_service.get_db_connection = original_get_db
