@@ -8,9 +8,10 @@ load_dotenv()
 @pytest.fixture(scope='session')
 def test_db():
     """Create a test database for alert service"""
+    # First connect to default postgres database to create test database
     conn = psycopg2.connect(
         host=os.getenv('DB_HOST', 'localhost'),
-        database='inventory_test',
+        database='postgres',  # Connect to default postgres db
         user=os.getenv('DB_USER', 'postgres'),
         password=os.getenv('DB_PASSWORD', 'postgres'),
         port=os.getenv('DB_PORT', 5432),
