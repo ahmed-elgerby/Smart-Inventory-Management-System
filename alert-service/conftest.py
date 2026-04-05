@@ -75,7 +75,15 @@ def test_client(test_db):
     # Monkey patch the database connection
     import alert_service
     original_get_db = alert_service.get_db_connection
-    alert_service.get_db_connection = lambda: test_db
+    def mock_get_db():
+        return psycopg2.connect(
+            host=os.getenv('DB_HOST', 'localhost'),
+            database='inventory_test',
+            user=os.getenv('DB_USER', 'postgres'),
+            password=os.getenv('DB_PASSWORD', 'postgres'),
+            port=os.getenv('DB_PORT', 5432),
+        )
+    alert_service.get_db_connection = mock_get_db
 
     with app.test_client() as client:
         yield client
