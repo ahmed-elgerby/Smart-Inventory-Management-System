@@ -2,6 +2,7 @@ import pytest
 import psycopg2
 import os
 from dotenv import load_dotenv
+from werkzeug.security import generate_password_hash
 
 load_dotenv()
 
@@ -71,8 +72,9 @@ def test_db():
 
     # Seed test data
     cur.execute("INSERT INTO locations (name, address) VALUES ('Test Warehouse','123 Test St')")
+    password_hash = generate_password_hash('password')
     cur.execute('''INSERT INTO users (username,password_hash,full_name,role)
-                   VALUES ('testuser', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj8GwqGvGjS', 'Test User', 'admin')''')
+                   VALUES ('testuser', %s, 'Test User', 'admin')''', (password_hash,))
 
     cur.execute('''INSERT INTO items (name, sku, quantity, min_quantity, price, category)
                    VALUES ('Laptop', 'LAP001', 5, 10, 999.99, 'Electronics')''')

@@ -2,6 +2,7 @@ import pytest
 import psycopg2
 import os
 from dotenv import load_dotenv
+from werkzeug.security import generate_password_hash
 
 load_dotenv()
 
@@ -82,12 +83,13 @@ def test_db():
 
     # Seed test data
     cur.execute("INSERT INTO locations (name, address) VALUES ('Test Warehouse','123 Test St')")
+    password_hash = generate_password_hash('password')
     cur.execute('''INSERT INTO users (username,password_hash,full_name,role)
-                   VALUES ('testadmin', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj8GwqGvGjS', 'Test Admin', 'admin')''')
+                   VALUES ('testadmin', %s, 'Test Admin', 'admin')''', (password_hash,))
     cur.execute('''INSERT INTO users (username,password_hash,full_name,role)
-                   VALUES ('testmgr', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj8GwqGvGjS', 'Test Manager', 'manager')''')
+                   VALUES ('testmgr', %s, 'Test Manager', 'manager')''', (password_hash,))
     cur.execute('''INSERT INTO users (username,password_hash,full_name,role)
-                   VALUES ('testemp', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj8GwqGvGjS', 'Test Employee', 'employee')''')
+                   VALUES ('testemp', %s, 'Test Employee', 'employee')''', (password_hash,))
 
     test_conn.commit()
     cur.close()
