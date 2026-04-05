@@ -107,7 +107,13 @@ def test_client(test_db):
     # Override DB connection for tests
     original_get_db = app.config.get('get_db_func')
     def mock_get_db():
-        return test_db
+        return psycopg2.connect(
+            host=os.getenv('DB_HOST', 'localhost'),
+            database='inventory_test',
+            user=os.getenv('DB_USER', 'postgres'),
+            password=os.getenv('DB_PASSWORD', 'postgres'),
+            port=os.getenv('DB_PORT', 5432),
+        )
 
     # Monkey patch the get_db function
     import backend
@@ -125,7 +131,7 @@ def auth_token(test_client):
     """Get an authentication token for testing"""
     response = test_client.post('/auth/login', json={
         'username': 'testadmin',
-        'password': 'admin123'
+        'password': 'password'
     })
     data = response.get_json()
     return data['token']
