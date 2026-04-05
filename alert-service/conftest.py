@@ -2,6 +2,7 @@ import pytest
 import psycopg2
 import os
 from dotenv import load_dotenv
+from werkzeug.security import generate_password_hash
 
 load_dotenv()
 
