@@ -16,7 +16,7 @@ pipeline {
                     mkdir -p ${TEST_RESULTS_DIR}
 
                     # Ensure Git is installed
-                    if ! command -v git >/dev/null; then
+                    if ! git -v>/dev/null; then
                         echo "Git not found, installing..."
                         apt-get update && apt-get install -y git
                     fi
