@@ -1,12 +1,19 @@
-apiVersion: v1
-kind: Pod
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: FE
-  labels:
-    component: fe
 spec:
-  containers:
-    - name: FE
-      image: ahmedelgerby/inventory-frontend:latest
-      ports:
-        - containerPort: 80
+  replicas: 2
+  selector:
+    matchLabels:
+      component: fe
+  template:
+    metadata:
+      labels:
+        component: fe
+    spec:
+      containers:
+        - name: FE
+          image: ahmedelgerby/inventory-frontend:latest
+          ports:
+            - containerPort: 80
