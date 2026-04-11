@@ -81,6 +81,9 @@ pipeline {
         
         stage('Pushing to Docker Hub') {
             steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                }
                 // Only push all images created if tests passed
                 sh '''
                     docker push ahmedilgerby/inventory_db:latest
