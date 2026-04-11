@@ -79,6 +79,18 @@ pipeline {
             }
         }
         
+        stage('Pushing to Docker Hub') {
+            steps {
+                sh '''
+                    docker push ahmedelgerby/Inventory_DB:latest
+                    docker push ahmedelgerby/Inventory_BE:latest
+                    docker push ahmedelgerby/Inventory_alert_service:latest
+                    docker push ahmedelgerby/Inventory_reporting_service:latest
+                    docker push ahmedelgerby/Inventory_FrontEnd:latest
+                '''
+            }
+        }
+
         stage('Build Artifacts') {
             when { expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' } }
             steps {
