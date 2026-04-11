@@ -81,6 +81,7 @@ pipeline {
         
         stage('Pushing to Docker Hub') {
             steps {
+                // Only push all images created if tests passed
                 sh '''
                     docker push ahmedelgerby/inventory_db:latest
                     docker push ahmedelgerby/inventory_be:latest
