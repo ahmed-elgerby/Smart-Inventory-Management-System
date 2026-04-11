@@ -1,7 +1,10 @@
 services:
 
   db:
-    build: ./DB
+    build:
+       context:  ./DB
+       tags:
+         - ahmedelgerby/Inventory_DB    
     container_name: Our_DB
     volumes:
       - pg_data:/var/lib/postgresql/data
@@ -15,7 +18,10 @@ services:
       start_period: 30s
 
   backend:
-    build: ./backend
+    build: 
+       context: ./backend
+       tags:
+         - ahmedelgerby/Inventory_BE
     container_name: BE
     environment:
       DB_HOST: db
@@ -38,7 +44,10 @@ services:
     restart: unless-stopped
 
   alert_service:
-    build: ./alert-service
+    build: 
+       context: ./alert-service
+       tags:
+         - ahmedelgerby/Inventory_alert_service
     container_name: Alert_Service
     environment:
       DB_HOST: db
@@ -54,7 +63,10 @@ services:
     restart: unless-stopped
 
   reporting_service:
-    build: ./reporting-service
+    build: 
+       context: ./reporting-service
+       tags:
+         - ahmedelgerby/Inventory_reporting_service
     container_name: Reporting_Service
     environment:
       DB_HOST: db
@@ -70,7 +82,10 @@ services:
     restart: unless-stopped
 
   nginx:
-    build: ./FrontEnd
+    build: 
+       context: ./FrontEnd
+       tags:
+         - ahmedelgerby/Inventory_FrontEnd
     container_name: FE
     ports:
       - "80:80"
