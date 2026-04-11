@@ -4,7 +4,7 @@ services:
     build:
        context:  ./DB
        tags:
-         - ahmedelgerby/inventory_db    
+         - ahmedilgerby/inventory_db    
     container_name: Our_DB
     volumes:
       - pg_data:/var/lib/postgresql/data
@@ -21,7 +21,7 @@ services:
     build: 
        context: ./backend
        tags:
-         - ahmedelgerby/inventory_be
+         - ahmedilgerby/inventory_be
     container_name: BE
     environment:
       DB_HOST: db
@@ -47,7 +47,7 @@ services:
     build: 
        context: ./alert-service
        tags:
-         - ahmedelgerby/inventory_alert_service
+         - ahmedilgerby/inventory_alert_service
     container_name: Alert_Service
     environment:
       DB_HOST: db
@@ -66,7 +66,7 @@ services:
     build: 
        context: ./reporting-service
        tags:
-         - ahmedelgerby/inventory_reporting_service
+         - ahmedilgerby/inventory_reporting_service
     container_name: Reporting_Service
     environment:
       DB_HOST: db
