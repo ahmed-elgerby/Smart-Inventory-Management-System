@@ -86,11 +86,12 @@ pipeline {
                 }
                 // Only push all images created if tests passed
                 sh '''
-                    docker push ahmedilgerby/inventory_db:latest
-                    docker push ahmedilgerby/inventory_be:latest
-                    docker push ahmedilgerby/inventory_alert_service:latest
-                    docker push ahmedilgerby/inventory_reporting_service:latest
-                    docker push ahmedilgerby/inventory_frontend:latest
+                    docker push ahmedilgerby/inventory_db:latest &
+                    docker push ahmedilgerby/inventory_be:latest &
+                    docker push ahmedilgerby/inventory_alert_service:latest &
+                    docker push ahmedilgerby/inventory_reporting_service:latest &
+                    docker push ahmedilgerby/inventory_frontend:latest &
+                    wait
                 '''
             }
         }
