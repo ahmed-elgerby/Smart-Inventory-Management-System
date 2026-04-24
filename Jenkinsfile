@@ -62,12 +62,12 @@ pipeline {
                 
                 // Retry block for alert service tests
                 retry(2) {
-                    sh 'docker-compose exec -T alert_service pytest -v --tb=short'
+                    sh 'docker-compose exec -T alert-service pytest -v --tb=short'
                 }
                 
                 // Retry block for reporting service tests
                 retry(2) {
-                    sh 'docker-compose exec -T reporting_service pytest -v --tb=short'
+                    sh 'docker-compose exec -T reporting-service pytest -v --tb=short'
                 }
                 
                 // Integration tests
