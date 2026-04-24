@@ -32,9 +32,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      alert_service:
+      alert-service:
         condition: service_started
-      reporting_service:
+      reporting-service:
         condition: service_started
     ports:
       - "5000:5000"
@@ -43,12 +43,12 @@ services:
       - ./backend/conftest.py:/app/conftest.py:ro
     restart: unless-stopped
 
-  alert_service:
+  alert-service:
     build: 
        context: ./alert-service
        tags:
          - ahmedilgerby/inventory_alert_service
-    container_name: Alert_Service
+    container_name: alert-service
     environment:
       DB_HOST: db
       DB_PORT: 5432
@@ -62,12 +62,12 @@ services:
       - "5001:5001"
     restart: unless-stopped
 
-  reporting_service:
+  reporting-service:
     build: 
        context: ./reporting-service
        tags:
          - ahmedilgerby/inventory_reporting_service
-    container_name: Reporting_Service
+    container_name: reporting-service
     environment:
       DB_HOST: db
       DB_PORT: 5432
