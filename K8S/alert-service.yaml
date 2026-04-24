@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: alert-service
+  name: alert-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alert-service
+  strategy: 
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: alert-service
+    spec:
+      containers:
+      - image: ahmedilgerby/inventory_alert_service:latest
+        name: inventory-alert-service
+        env:
+        - name: DB_HOST
+          value: "db-service"
+        - name: DB_NAME
+          value: "inventory"
+        - name: DB_USER
+          value: "postgres"
+        - name: DB_PASSWORD
+          value: "postgres"
+        - name: DB_PORT
+          value: "5432"
+        ports:
+        - containerPort: 5001
