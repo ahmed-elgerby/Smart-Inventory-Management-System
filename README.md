@@ -8,12 +8,11 @@ o Develop a system to track inventory in real-time, generate alerts for low stoc
 o We are making this **project** as a part of our **DevOps course in Digital Egypt Pioneers initiative "DEPI"**.
 
 **Team Members:**
-1.	Ahmed Osama Mohamed Elgerby Mohamed Elsawy -----> **Team Leader**,
-2.	Ahmed Abbas Kamel,
-3.	Kerolos Ashraf Shawky,
-4.	Mahmoud Mohamed Abdelghany,
-5.	Manar Mohamed Hefny,
-6.	Mohamed Ramadan Abdel Moneim.	
+1.	Ahmed Osama Mohamed Elgerby Mohamed Elsawy ---> **Team Leader**,
+2.	Kerolos Ashraf Shawky,
+3.	Mahmoud Mohamed Abdelghany,
+4.	Manar Mohamed Hefny,
+5.	Mohamed Ramadan Abdel Moneim.	
   
 **Project Plan:** 
 
@@ -23,42 +22,30 @@ o We are making this **project** as a part of our **DevOps course in Digital Egy
 2. Containerization:
    Writing the needed Dockerfiles and Docker-compose.yml 
 
-3. Infrastructure as Code:
-   Terraform AWS setup, VPC, EKS, RDS configuration
+3. Orchestration:
+   Writing Kubernetes files.
    
-4. Orchestration:
-   Kubernetes deployment
-
-5. CI/CD Pipeline:
-   Jenkins setup, Automated builds, Auto-deployment
-
-6. Configuration Management:
-   Ansible automation, Server provisioning, Application deployment
-
-7. Monitoring & Finalization:
-   Prometheus metrics, Grafana dashboards, Documentation & demo
+4. Monitoring:
+   Preparing Prometheus metrics, Grafana dashboards.
+   
+6. CI/CD Pipeline:
+   Writing Jenkins setup to make Automated builds, Auto-deployment
+   
+7. Infrastructure as Code:
+   Terraform AWS setup, VPC, EKS, RDS configuration.
+   
+8. Configuration Management:
+   Ansible automation, Server provisioning, Application deployment.
+   
+9. Finalization:
+   Writing Documentation & Preparing demo.
   
 **Roles & Responsibilities:**
-1.	Ahmed Osama Mohamed Elgerby Mohamed Elsawy ----->  Project coordination, Docker containerization, Inventory tracking service, Nginx for dashboard access, Git repository for code and scripts
-2.	Ahmed Abbas Kamel -----> CI/CD pipeline for automated updates
-3.	Kerolos Ashraf Shawky -----> Kubernetes deployment for scalable services, Alert service for low stock
-4.	Mahmoud Mohamed Abdelghany -----> Prometheus monitoring for system and container metrics
-5.	Manar Mohamed Hefny-----> Ansible scripts for server/service configuration, Web dashboard for managers, Final presentation
-6.	Mohamed Ramadan Abdel Moneim -----> Terraform scripts for AWS EC2, S3, VPC  
- 
-**KPIs (Key Performance Indicators) – Metrics for project success:**
-
-Deployment Success: 95%+
-
-Uptime: 99%+
-
-Build Time: <10 min
-
-Recovery Time: <1 hour
-
-Infrastructure Provision: <30 min
-  
- 
+1.	Ahmed Osama Mohamed Elgerby Mohamed Elsawy --->  Project coordination and main Code, Git repository for code and scripts, Kubernetes codes for scalable services. 
+2.	Kerolos Ashraf Shawky ---> CI/CD pipeline for automated updates.
+3.	Mahmoud Mohamed Abdelghany -----> Prometheus monitoring for system and container metrics, Ansible scripts for server/service configuration.
+4.	Manar Mohamed Hefny-----> Docker containerization, Final presentation.
+5.	Mohamed Ramadan Abdel Moneim -----> Terraform scripts for AWS EC2, S3, VPC.  
  
 **Instructor**  
 
