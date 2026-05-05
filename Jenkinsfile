@@ -132,10 +132,10 @@ pipeline {
                     export ANSIBLE_HOST_KEY_CHECKING=False
                     
                     # Run EC2 provisioning
-                    ansible-playbook -i hosts.ini ec2-provision.yml -o StrictHostKeyChecking=no
+                    ansible-playbook -i hosts.ini ec2-provision.yml
                     
                     # Copy K8S files via ansible and deploy
-                    ansible-playbook -i hosts.ini deploy-k8s.yml -o StrictHostKeyChecking=no
+                    ansible-playbook -i hosts.ini deploy-k8s.yml
                 '''
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
                     sh '''
@@ -159,6 +159,18 @@ pipeline {
                 docker-compose logs > logs/containers.log 2>&1 || true
             '''
             archiveArtifacts artifacts: 'logs/**/*.log,test-results/**/*.xml', allowEmptyArchive: true
+        }
+        
+        failure {
+            withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+                sh '''
+                    echo "Ansible failed, destroying Terraform resources..."
+                    cd Cloud
+                    export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                    export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                    terraform destroy -auto-approve || echo "Terraform destroy failed or no resources to destroy"
+                '''
+            }
         }
         
         cleanup {
