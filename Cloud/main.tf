@@ -159,6 +159,10 @@ resource "aws_lb_target_group" "inventory_tg" {
   }
 }
 
+output "aws_lb_inventory_alb_dns_name" {
+  value = aws_lb.inventory_alb.dns_name
+}
+
 resource "aws_lb_target_group_attachment" "inventory_controller" {
   target_group_arn = aws_lb_target_group.inventory_tg.arn
   target_id        = aws_instance.instances["controller"].id

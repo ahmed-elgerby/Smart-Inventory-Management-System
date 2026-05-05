@@ -110,12 +110,16 @@ pipeline {
 
         stage('Terraform Deploy') {
             steps {
-                sh '''
-                    set -e
-                    cd Cloud
-                    terraform init -input=false
-                    terraform apply -auto-approve
-                '''
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+                    sh '''
+                        set -e
+                        cd Cloud
+                        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                        terraform init -input=false
+                        terraform apply -auto-approve
+                    '''
+                }
             }
         }
         stage('Ansible Provision & Deploy K8S') {
@@ -132,15 +136,18 @@ pipeline {
                     
                     # Copy K8S files via ansible and deploy
                     ansible-playbook -i hosts.ini deploy-k8s.yml -o StrictHostKeyChecking=no
-                    
-                    # Output ALB DNS name
-                    echo ""
-                    echo "========================================"
-                    echo "Deployment Complete!"
-                    echo "========================================"
-                    cd ../Cloud
-                    terraform output -raw aws_lb_inventory_alb_dns_name || echo "ALB DNS not yet available, check AWS console"
                 '''
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+                    sh '''
+                        # Output ALB DNS name
+                        echo ""
+                        echo "========================================"
+                        echo "Deployment Complete!"
+                        echo "========================================"
+                        cd Cloud
+                        terraform output -raw aws_lb_inventory_alb_dns_name || echo "ALB DNS not yet available, check AWS console"
+                    '''
+                }
             }
         }
     }
