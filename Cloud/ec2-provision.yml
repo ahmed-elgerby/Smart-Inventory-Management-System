@@ -1,0 +1,393 @@
+---
+- name: Provision controller node
+  hosts: controller
+  become: yes
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Add Kubernetes APT repository key
+      apt_key:
+        url: https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key
+        state: present
+
+    - name: Add Kubernetes APT repository
+      apt_repository:
+        repo: deb https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /
+        state: present
+        filename: kubernetes
+
+    - name: Install base packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - docker.io
+          - kubelet
+          - kubeadm
+          - kubectl
+          - python3
+          - python3-apt
+          - python3-pip
+          - git
+        state: present
+        update_cache: yes
+
+    # --- ADDED: Containerd Configuration Fix ---
+    - name: Ensure containerd config directory exists
+      file:
+        path: /etc/containerd
+        state: directory
+        mode: '0755'
+
+    - name: Generate default containerd configuration
+      shell: containerd config default > /etc/containerd/config.toml
+      args:
+        creates: /etc/containerd/config.toml
+
+    - name: Set SystemdCgroup to true in containerd config
+      replace:
+        path: /etc/containerd/config.toml
+        regexp: 'SystemdCgroup = false'
+        replace: 'SystemdCgroup = true'
+
+    - name: Restart containerd
+      service:
+        name: containerd
+        state: restarted
+
+    - name: Configure crictl to use containerd endpoint
+      command: crictl config --set runtime-endpoint=unix:///run/containerd/containerd.sock --set image-endpoint=unix:///run/containerd/containerd.sock
+      changed_when: false
+    # --------------------------------------------
+
+    - name: Disable swap now
+      command: swapoff -a
+      ignore_errors: yes
+
+    - name: Disable swap permanently in /etc/fstab
+      replace:
+        path: /etc/fstab
+        regexp: '^([^#].*\s+swap\s+.*)$'
+        replace: '# \1'
+        backup: yes
+      ignore_errors: yes
+
+    - name: Load required kernel modules
+      copy:
+        dest: /etc/modules-load.d/k8s.conf
+        content: |
+          br_netfilter
+          overlay
+      notify: Reload modules
+
+    - name: Load br_netfilter module immediately
+      modprobe:
+        name: br_netfilter
+        state: present
+
+    - name: Load overlay module immediately
+      modprobe:
+        name: overlay
+        state: present
+
+    - name: Configure Kubernetes networking sysctl
+      copy:
+        dest: /etc/sysctl.d/99-k8s.conf
+        content: |
+          net.bridge.bridge-nf-call-iptables = 1
+          net.bridge.bridge-nf-call-ip6tables = 1
+          net.ipv4.ip_forward = 1
+      notify: Reload sysctl
+
+    - name: Configure Docker daemon for Kubernetes
+      copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "exec-opts": ["native.cgroupdriver=systemd"],
+            "log-driver": "json-file",
+            "storage-driver": "overlay2"
+          }
+        mode: '0644'
+
+    - name: Restart Docker
+      service:
+        name: docker
+        state: restarted
+        enabled: yes
+
+    - name: Create DB storage mount point
+      file:
+        path: /mnt/db-data
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Detect attached unmounted EBS device
+      shell: |
+        root_device=$(findmnt -n -o SOURCE /)
+        for dev in /dev/xvd[b-z] /dev/sd[b-z] /dev/nvme*n1; do
+          if [ -b "$dev" ] && [ "$dev" != "$root_device" ]; then
+            mountpoint=$(lsblk -no MOUNTPOINT "$dev")
+            if [ -z "$mountpoint" ]; then
+              echo "$dev"
+              exit 0
+            fi
+          fi
+        done
+        exit 1
+      register: ebs_device
+      changed_when: false
+      failed_when: ebs_device.rc != 0
+
+    - name: Format EBS volume if unformatted
+      shell: |
+        if [ -b "{{ ebs_device.stdout }}" ] && [ -z "$(lsblk -no FSTYPE {{ ebs_device.stdout }})" ]; then
+          mkfs.ext4 -F "{{ ebs_device.stdout }}"
+        fi
+      when: ebs_device.stdout != ""
+      changed_when: false
+
+    - name: Mount DB volume
+      mount:
+        path: /mnt/db-data
+        src: "{{ ebs_device.stdout }}"
+        fstype: ext4
+        state: mounted
+      when: ebs_device.stdout != ""
+    - name: Enable kubelet
+      service:
+        name: kubelet
+        enabled: yes
+        state: started
+
+    - name: Initialize Kubernetes cluster
+      command: kubeadm init --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address={{ ansible_default_ipv4.address }}
+      args:
+        creates: /etc/kubernetes/admin.conf
+
+    - name: Restart kubelet after init
+      service:
+        name: kubelet
+        state: restarted
+
+    - name: Wait for API server to be ready
+      command: kubectl --kubeconfig /etc/kubernetes/admin.conf cluster-info
+      register: api_check
+      retries: 30
+      delay: 10
+      until: api_check.rc == 0
+      changed_when: false
+
+    - name: Create kube config directory for ubuntu
+      file:
+        path: /home/ubuntu/.kube
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
+
+    - name: Copy kube admin config for ubuntu
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /home/ubuntu/.kube/config
+        owner: ubuntu
+        group: ubuntu
+        mode: '0644'
+        remote_src: yes
+
+    - name: Install Flannel CNI
+      command: kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml
+      register: flannel_apply
+      retries: 10
+      delay: 15
+      until: flannel_apply.rc == 0
+      args:
+        creates: /etc/kubernetes/manifests/kube-flannel-ds.yaml
+
+    - name: Allow pods on master node
+      shell: |
+        kubectl --kubeconfig /etc/kubernetes/admin.conf taint nodes --all node-role.kubernetes.io/control-plane- || true
+
+    - name: Create deployment directory
+      file:
+        path: /opt/smart-inventory
+        state: directory
+        mode: '0755'
+
+    - name: Get kubeadm join command
+      shell: kubeadm token create --print-join-command
+      register: join_command
+
+    - name: Store kubeadm join command in host vars
+      set_fact:
+        kube_join_cmd: "{{ join_command.stdout }}"
+
+  handlers:
+    - name: Reload sysctl
+      command: sysctl --system
+
+    - name: Reload modules
+      command: systemctl restart systemd-modules-load
+
+- name: Provision worker node
+  hosts: worker
+  become: yes
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Add Kubernetes APT repository key
+      apt_key:
+        url: https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key
+        state: present
+
+    - name: Add Kubernetes APT repository
+      apt_repository:
+        repo: deb https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /
+        state: present
+        filename: kubernetes
+
+    - name: Install base packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - docker.io
+          - kubelet
+          - kubeadm
+          - kubectl
+          - python3
+          - python3-apt
+          - python3-pip
+          - git
+        state: present
+        update_cache: yes
+
+    # --- ADDED: Containerd Configuration Fix (Worker) ---
+    - name: Ensure containerd config directory exists
+      file:
+        path: /etc/containerd
+        state: directory
+        mode: '0755'
+
+    - name: Generate default containerd configuration
+      shell: containerd config default > /etc/containerd/config.toml
+      args:
+        creates: /etc/containerd/config.toml
+
+    - name: Set SystemdCgroup to true in containerd config
+      replace:
+        path: /etc/containerd/config.toml
+        regexp: 'SystemdCgroup = false'
+        replace: 'SystemdCgroup = true'
+
+    - name: Restart containerd
+      service:
+        name: containerd
+        state: restarted
+
+    - name: Configure crictl to use containerd endpoint
+      command: crictl config --set runtime-endpoint=unix:///run/containerd/containerd.sock --set image-endpoint=unix:///run/containerd/containerd.sock
+      changed_when: false
+    # ----------------------------------------------------
+
+    - name: Disable swap now
+      command: swapoff -a
+      ignore_errors: yes
+
+    - name: Disable swap permanently in /etc/fstab
+      replace:
+        path: /etc/fstab
+        regexp: '^([^#].*\s+swap\s+.*)$'
+        replace: '# \1'
+        backup: yes
+      ignore_errors: yes
+
+    - name: Load required kernel modules
+      copy:
+        dest: /etc/modules-load.d/k8s.conf
+        content: |
+          br_netfilter
+          overlay
+      notify: Reload modules
+
+    - name: Load br_netfilter module immediately
+      modprobe:
+        name: br_netfilter
+        state: present
+
+    - name: Load overlay module immediately
+      modprobe:
+        name: overlay
+        state: present
+
+    - name: Configure Kubernetes networking sysctl
+      copy:
+        dest: /etc/sysctl.d/99-k8s.conf
+        content: |
+          net.bridge.bridge-nf-call-iptables = 1
+          net.bridge.bridge-nf-call-ip6tables = 1
+          net.ipv4.ip_forward = 1
+      notify: Reload sysctl
+
+    - name: Configure Docker daemon for Kubernetes
+      copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "exec-opts": ["native.cgroupdriver=systemd"],
+            "log-driver": "json-file",
+            "storage-driver": "overlay2"
+          }
+        mode: '0644'
+
+    - name: Restart Docker
+      service:
+        name: docker
+        state: restarted
+        enabled: yes
+
+    - name: Enable kubelet
+      service:
+        name: kubelet
+        enabled: yes
+        state: started
+
+    - name: Create deployment directory
+      file:
+        path: /opt/smart-inventory
+        state: directory
+        mode: '0755'
+
+    - name: Wait for controller API server to be reachable
+      wait_for:
+        host: "{{ hostvars['controller-node']['ansible_default_ipv4']['address'] }}"
+        port: 6443
+        timeout: 300
+        state: started
+
+    - name: Join worker to Kubernetes cluster
+      command: "{{ hostvars['controller-node']['kube_join_cmd'] }}"
+      args:
+        creates: /etc/kubernetes/kubelet.conf
+      when: hostvars['controller-node']['kube_join_cmd'] is defined
+
+  handlers:
+    - name: Reload sysctl
+      command: sysctl --system
+
+    - name: Reload modules
+      command: systemctl restart systemd-modules-load

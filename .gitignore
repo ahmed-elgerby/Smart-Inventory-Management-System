@@ -49,6 +49,9 @@ Jenkinsfile.local
 .jenkins/
 pipeline.log
 
+# Terraform generated secrets
+terraform/private_key.pem
+
 # Temporary files
 *.tmp
 *.bak

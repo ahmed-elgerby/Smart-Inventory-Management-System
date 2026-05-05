@@ -21,11 +21,11 @@ pipeline {
                     # Try virtual env
                     if python3 -m venv ci_env; then
                         . ci_env/bin/activate
-                        pip install --upgrade pip setuptools wheel requests
+                        pip install --upgrade pip setuptools wheel requests ansible
                         deactivate
                     else
                         echo "venv creation failed, using isolated project install"
-                        python3 -m pip install --upgrade pip setuptools wheel requests --target ./ci_env_lib --break-system-packages
+                        python3 -m pip install --upgrade pip setuptools wheel requests ansible --target ./ci_env_lib --break-system-packages
                         export PYTHONPATH="$PWD/ci_env_lib:$PYTHONPATH"
                     fi
                 '''
@@ -84,8 +84,20 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
                 }
-                // Only push all images created if tests passed
                 sh '''
+                    set -e
+                    if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+                        git diff --quiet HEAD~1 HEAD -- DB backend alert-service reporting-service FrontEnd docker-compose.yml || CHANGED=1
+                    else
+                        CHANGED=1
+                    fi
+
+                    if [ -z "$CHANGED" ]; then
+                        echo "No relevant image source changes detected. Skipping Docker push."
+                        exit 0
+                    fi
+
+                    echo "Changes detected. Pushing updated Docker images..."
                     docker push ahmedilgerby/inventory_db:latest &
                     docker push ahmedilgerby/inventory_be:latest &
                     docker push ahmedilgerby/inventory_alert_service:latest &
@@ -96,20 +108,38 @@ pipeline {
             }
         }
 
-        stage('Build Artifacts') {
-            when { expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' } }
+        stage('Terraform Deploy') {
             steps {
                 sh '''
-                    mkdir -p deployment
-                    cp -r backend alert-service reporting-service DB FrontEnd deployment/
-                    cp docker-compose.yml .env.ci deployment/ 2>/dev/null || true
+                    set -e
+                    cd Cloud
+                    terraform init -input=false
+                    terraform apply -auto-approve
+                '''
+            }
+        }
+        stage('Ansible Provision & Deploy K8S') {
+            steps {
+                sh '''
+                    set -e
+                    . ci_env/bin/activate
+                    cd Cloud
                     
-                    cat > deployment/BUILD_INFO.txt <<EOF
-Build: ${BUILD_NUMBER}
-Commit: ${GIT_COMMIT}
-EOF
+                    export ANSIBLE_HOST_KEY_CHECKING=False
                     
-                    tar -czf "inventory-app-${BUILD_NUMBER}.tar.gz" deployment/
+                    # Run EC2 provisioning
+                    ansible-playbook -i hosts.ini ec2-provision.yml -o StrictHostKeyChecking=no
+                    
+                    # Copy K8S files via ansible and deploy
+                    ansible-playbook -i hosts.ini deploy-k8s.yml -o StrictHostKeyChecking=no
+                    
+                    # Output ALB DNS name
+                    echo ""
+                    echo "========================================"
+                    echo "Deployment Complete!"
+                    echo "========================================"
+                    cd ../Cloud
+                    terraform output -raw aws_lb_inventory_alb_dns_name || echo "ALB DNS not yet available, check AWS console"
                 '''
             }
         }
@@ -121,13 +151,13 @@ EOF
                 mkdir -p logs
                 docker-compose logs > logs/containers.log 2>&1 || true
             '''
-            archiveArtifacts artifacts: 'logs/**/*.log,test-results/**/*.xml,inventory-app-*.tar.gz', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'logs/**/*.log,test-results/**/*.xml', allowEmptyArchive: true
         }
         
         cleanup {
             sh '''
                 docker-compose down -v || true
-                rm -rf ci_env deployment __pycache__ *.pyc .pytest_cache || true
+                rm -rf ci_env __pycache__ *.pyc .pytest_cache || true
             '''
         }
     }

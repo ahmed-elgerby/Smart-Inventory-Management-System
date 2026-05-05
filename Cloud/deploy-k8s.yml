@@ -1,0 +1,49 @@
+---
+- name: Copy and deploy Kubernetes manifests to EC2
+  hosts: controller
+  become: yes
+
+  tasks:
+    - name: Wait for Kubernetes API server to be ready
+      command: kubectl --kubeconfig /etc/kubernetes/admin.conf cluster-info
+      register: api_check
+      retries: 30
+      delay: 10
+      until: api_check.rc == 0
+      changed_when: false
+
+    - name: Create remote Kubernetes manifest directory
+      file:
+        path: /opt/smart-inventory/k8s
+        state: directory
+        mode: '0755'
+        owner: ubuntu
+        group: ubuntu
+
+    - name: Copy K8S manifest files to remote host
+      copy:
+        src: ../K8S/
+        dest: /opt/smart-inventory/k8s/
+        owner: ubuntu
+        group: ubuntu
+        mode: '0644'
+
+    - name: Apply Kubernetes PV manifest first
+      command: kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f /opt/smart-inventory/k8s/pv.yaml
+      args:
+        chdir: /opt/smart-inventory/k8s
+
+    - name: Apply Kubernetes PVC manifest
+      command: kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f /opt/smart-inventory/k8s/pvc.yaml
+      args:
+        chdir: /opt/smart-inventory/k8s
+
+    - name: Apply Kubernetes manifests
+      shell: |
+        kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f /opt/smart-inventory/k8s
+      args:
+        chdir: /opt/smart-inventory/k8s
+      register: manifest_apply
+      retries: 5
+      delay: 10
+      until: manifest_apply.rc == 0
