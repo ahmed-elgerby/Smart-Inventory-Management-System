@@ -62,16 +62,18 @@ locals {
   create_sg       = length(data.aws_security_groups.existing_inventory_sg.ids) == 0
   create_alb_sg   = length(data.aws_security_groups.existing_alb_sg.ids) == 0
 
-  controller_public_ips = concat(aws_instance.controller[*].public_ip, [for i in data.aws_instance.controller : i.public_ip])
-  worker_public_ips     = concat(aws_instance.worker[*].public_ip, [for i in data.aws_instance.worker : i.public_ip])
-  controller_ids        = concat(aws_instance.controller[*].id, [for i in data.aws_instance.controller : i.id])
-  worker_ids            = concat(aws_instance.worker[*].id, [for i in data.aws_instance.worker : i.id])
-  controller_public_ip  = local.controller_public_ips[0]
-  worker_public_ip      = local.worker_public_ips[0]
-  controller_id         = local.controller_ids[0]
-  worker_id             = local.worker_ids[0]
-  controller_host_name  = length(data.aws_instance.controller) > 0 ? "controller-node-existing" : "controller-node"
-  worker_host_name      = length(data.aws_instance.worker) > 0 ? "worker-node-existing" : "worker-node"
+  instances_to_create = {
+    controller = length(data.aws_instances.existing_controller.ids) == 0
+    worker     = length(data.aws_instances.existing_worker.ids) == 0
+  }
+  instance_keys = [for k, v in local.instances_to_create : k if v]
+
+  controller_public_ip = length(data.aws_instances.existing_controller.ids) > 0 ? data.aws_instance.controller[0].public_ip : aws_instance.instances["controller"].public_ip
+  worker_public_ip     = length(data.aws_instances.existing_worker.ids) > 0 ? data.aws_instance.worker[0].public_ip : aws_instance.instances["worker"].public_ip
+  controller_id        = length(data.aws_instances.existing_controller.ids) > 0 ? data.aws_instance.controller[0].id : aws_instance.instances["controller"].id
+  worker_id            = length(data.aws_instances.existing_worker.ids) > 0 ? data.aws_instance.worker[0].id : aws_instance.instances["worker"].id
+  controller_host_name = length(data.aws_instances.existing_controller.ids) > 0 ? "controller-node-existing" : "controller-node"
+  worker_host_name     = length(data.aws_instances.existing_worker.ids) > 0 ? "worker-node-existing" : "worker-node"
 }
 
 # --- SECURITY GROUPS ---
@@ -139,50 +141,21 @@ resource "aws_security_group" "alb_sg" {
 
 # --- EC2 INSTANCES ---
 
-resource "aws_instance" "controller" {
-  count                       = length(data.aws_instances.existing_controller.ids) == 0 ? 1 : 0
+resource "aws_instance" "instances" {
+  for_each = toset(local.instance_keys)
+
   ami                         = "ami-0c7217cdde317cfec"
   instance_type               = "t3.small"
   vpc_security_group_ids      = [local.inventory_sg_id]
   associate_public_ip_address = true
   key_name                    = aws_key_pair.deployer.key_name
-  availability_zone           = "us-east-1a"
+  availability_zone           = each.key == "controller" ? "us-east-1a" : "us-east-1b"
 
   tags = {
-    Name = "Smart-Inventory-controller"
+    Name = "Smart-Inventory-${each.key}"
   }
 }
 
-resource "aws_instance" "worker" {
-  count                       = length(data.aws_instances.existing_worker.ids) == 0 ? 1 : 0
-  ami                         = "ami-0c7217cdde317cfec"
-  instance_type               = "t3.small"
-  vpc_security_group_ids      = [local.inventory_sg_id]
-  associate_public_ip_address = true
-  key_name                    = aws_key_pair.deployer.key_name
-  availability_zone           = "us-east-1b"
-
-  tags = {
-    Name = "Smart-Inventory-worker"
-  }
-}
-
-resource "aws_ebs_volume" "controller_storage" {
-  count             = length(data.aws_instances.existing_controller.ids) == 0 ? 1 : 0
-  availability_zone = aws_instance.controller[0].availability_zone
-  size              = 5
-  type              = "gp2"
-  tags = {
-    Name = "smart-inventory-controller-storage"
-  }
-}
-
-resource "aws_volume_attachment" "controller_storage_attach" {
-  count       = length(data.aws_instances.existing_controller.ids) == 0 ? 1 : 0
-  device_name = "/dev/sdf"
-  volume_id   = aws_ebs_volume.controller_storage[0].id
-  instance_id = aws_instance.controller[0].id
-}
 
 # --- DATA SOURCES FOR ALB ---
 
