@@ -69,7 +69,7 @@
       "pluginVersion": "11.2.2",
       "targets": [
         {
-          "expr": "inventory_total_items",
+          "expr": "max(inventory_total_items)",
           "legendFormat": "Items",
           "refId": "A"
         }
@@ -130,7 +130,7 @@
       "pluginVersion": "11.2.2",
       "targets": [
         {
-          "expr": "inventory_low_stock",
+          "expr": "max(inventory_low_stock)",
           "legendFormat": "Low stock",
           "refId": "A"
         }
@@ -227,12 +227,12 @@
           "refId": "B"
         },
         {
-          "expr": "inventory_total_users",
+          "expr": "max(inventory_total_users)",
           "legendFormat": "Users",
           "refId": "C"
         },
         {
-          "expr": "inventory_total_locations",
+          "expr": "max(inventory_total_locations)",
           "legendFormat": "Locations",
           "refId": "D"
         }
@@ -293,7 +293,7 @@
       "pluginVersion": "11.2.2",
       "targets": [
         {
-          "expr": "up{job=\"inventory-backend\"}",
+          "expr": "max(up{job=\"backend\"})",
           "legendFormat": "Backend",
           "refId": "A"
         }
@@ -350,7 +350,7 @@
       "pluginVersion": "11.2.2",
       "targets": [
         {
-          "expr": "inventory_total_users",
+          "expr": "max(inventory_total_users)",
           "legendFormat": "Users",
           "refId": "A"
         }
@@ -407,7 +407,7 @@
       "pluginVersion": "11.2.2",
       "targets": [
         {
-          "expr": "inventory_total_locations",
+          "expr": "max(inventory_total_locations)",
           "legendFormat": "Locations",
           "refId": "A"
         }

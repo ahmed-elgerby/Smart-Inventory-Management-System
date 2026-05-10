@@ -2,7 +2,7 @@ groups:
   - name: smart-inventory.rules
     rules:
       - alert: SmartInventoryBackendDown
-        expr: up{job="inventory-backend"} == 0
+        expr: up{job="backend"} == 0
         for: 1m
         labels:
           severity: critical
