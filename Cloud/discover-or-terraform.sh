@@ -6,6 +6,9 @@ WORKER_NAME="Smart-Inventory-worker"
 KEY_FILE="${PWD}/smart-inventory-key.pem"
 DEPLOYMENT_ENV="${PWD}/deployment.env"
 
+export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-us-east-1}"
+export AWS_REGION="${AWS_REGION:-$AWS_DEFAULT_REGION}"
+
 write_inventory() {
   local controller_ip="$1"
   local worker_ip="$2"
