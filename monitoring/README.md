@@ -4,12 +4,12 @@ This folder contains the first local monitoring setup for the Smart Inventory pr
 
 ## Services
 
-- Prometheus: http://localhost:9091
+- Prometheus: http://localhost:19091
 - Grafana: http://localhost:3000
-- Alertmanager: http://localhost:9093
+- Alertmanager: http://localhost:19093
 - cAdvisor: http://localhost:8081
-- Node Exporter: http://localhost:9100
-- PostgreSQL exporter: http://localhost:9187
+- Node Exporter: http://localhost:19100
+- PostgreSQL exporter: http://localhost:19187
 
 Grafana default login:
 
