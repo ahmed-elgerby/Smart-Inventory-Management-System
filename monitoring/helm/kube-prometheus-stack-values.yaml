@@ -1,4 +1,5 @@
 grafana:
+  replicas: 1  # Reduce to 1 pod
   adminPassword: admin
   grafana.ini:
     server:
@@ -13,10 +14,12 @@ grafana:
 
 prometheus:
   prometheusSpec:
+    replicas: 1  # Reduce to 1 pod
     serviceMonitorSelectorNilUsesHelmValues: false
     ruleSelectorNilUsesHelmValues: false
 
 alertmanager:
+  replicas: 1  # Reduce to 1 pod
   enabled: true
   config:
     global:
@@ -37,3 +40,9 @@ alertmanager:
       - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
         channel: '#alerts'
         send_resolved: true
+
+kubeStateMetrics:
+  replicas: 1  # Reduce to 1 pod
+
+nodeExporter:
+  replicas: 1  # Reduce to 1 pod
