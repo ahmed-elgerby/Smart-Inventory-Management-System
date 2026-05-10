@@ -145,23 +145,21 @@
         exit 1
       register: ebs_device
       changed_when: false
-      failed_when: ebs_device.rc != 0
+      failed_when: false
 
     - name: Format EBS volume if unformatted
-      shell: |
-        if [ -b "{{ ebs_device.stdout }}" ] && [ -z "$(lsblk -no FSTYPE {{ ebs_device.stdout }})" ]; then
-          mkfs.ext4 -F "{{ ebs_device.stdout }}"
-        fi
-      when: ebs_device.stdout != ""
-      changed_when: false
+      community.general.filesystem:
+        fstype: ext4
+        dev: "{{ ebs_device.stdout }}"
+      when: ebs_device.rc == 0
 
-    - name: Mount DB volume
+    - name: Mount EBS volume
       mount:
         path: /mnt/db-data
         src: "{{ ebs_device.stdout }}"
         fstype: ext4
         state: mounted
-      when: ebs_device.stdout != ""
+      when: ebs_device.rc == 0
     - name: Enable kubelet
       service:
         name: kubelet

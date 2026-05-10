@@ -156,6 +156,23 @@ resource "aws_instance" "instances" {
   }
 }
 
+resource "aws_ebs_volume" "controller_storage" {
+  count             = contains(local.instance_keys, "controller") ? 1 : 0
+  availability_zone = aws_instance.instances["controller"].availability_zone
+  size              = 5
+  type              = "gp2"
+  tags = {
+    Name = "smart-inventory-controller-storage"
+  }
+}
+
+resource "aws_volume_attachment" "controller_storage_attach" {
+  count       = contains(local.instance_keys, "controller") ? 1 : 0
+  device_name = "/dev/sdf"
+  volume_id   = aws_ebs_volume.controller_storage[0].id
+  instance_id = aws_instance.instances["controller"].id
+}
+
 
 # --- DATA SOURCES FOR ALB ---
 
