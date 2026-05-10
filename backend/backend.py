@@ -755,12 +755,14 @@ def metrics():
         cur.execute('SELECT COUNT(*) FROM items');          ti = cur.fetchone()[0]
         cur.execute('SELECT COUNT(*) FROM items WHERE quantity < min_quantity'); ls = cur.fetchone()[0]
         cur.execute('SELECT COUNT(*) FROM users');          tu = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM users WHERE last_login >= NOW() - INTERVAL '5 minutes'"); ou = cur.fetchone()[0]
         cur.execute('SELECT COUNT(*) FROM locations');      tl = cur.fetchone()[0]
         cur.close(); conn.close()
         out = f"""# inventory metrics
 inventory_total_items {ti}
 inventory_low_stock {ls}
 inventory_total_users {tu}
+inventory_online_users {ou}
 inventory_total_locations {tl}
 """
         return out, 200, {'Content-Type': 'text/plain'}

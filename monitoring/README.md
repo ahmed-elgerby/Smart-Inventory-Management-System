@@ -31,6 +31,7 @@ The backend currently exposes:
 - `inventory_total_items`
 - `inventory_low_stock`
 - `inventory_total_users`
+- `inventory_online_users`
 - `inventory_total_locations`
 
 The alert-service exposes:
