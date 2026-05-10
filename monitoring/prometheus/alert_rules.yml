@@ -1,0 +1,43 @@
+groups:
+  - name: smart-inventory.rules
+    rules:
+      - alert: SmartInventoryBackendDown
+        expr: up{job="inventory-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Smart Inventory backend is down
+          description: Prometheus cannot scrape the backend metrics endpoint.
+      - alert: SmartInventoryLowStockItems
+        expr: inventory_low_stock > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Smart Inventory has low-stock items
+          description: There are {{ $value }} inventory items below minimum stock.
+      - alert: SmartInventoryHighActiveAlerts
+        expr: alert_service_active_alerts > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High number of active alerts
+          description: Alert service has {{ $value }} active alerts, which may indicate inventory issues.
+      - alert: SmartInventoryBackendHighCPU
+        expr: rate(container_cpu_usage_seconds_total{pod=~"backend-.*"}[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Backend service high CPU usage
+          description: Backend pod CPU usage is above 80% for 5 minutes.
+      - alert: NodeHighCPU
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High CPU usage on node
+          description: CPU usage is above 80%.

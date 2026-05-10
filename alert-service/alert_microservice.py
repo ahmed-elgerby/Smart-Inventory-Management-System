@@ -1,12 +1,26 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import os
+from prometheus_client import Gauge, generate_latest
 
 # Import the alert logic
 from alert_service import get_active_alerts, resolve_alert
 
 app = Flask(__name__)
 CORS(app)
+
+# Prometheus metrics
+active_alerts = Gauge('alert_service_active_alerts', 'Number of active alerts')
+
+@app.route('/metrics')
+def metrics():
+    # Update metrics
+    try:
+        alerts = get_active_alerts()
+        active_alerts.set(len(alerts))
+    except:
+        active_alerts.set(0)
+    return generate_latest(), 200, {'Content-Type': 'text/plain; charset=utf-8'}
 
 @app.route('/alerts', methods=['GET'])
 def alerts():

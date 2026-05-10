@@ -126,6 +126,9 @@ tr.tr-expanded{background:rgba(59,130,246,.08)!important}
 /* ── PAGE TITLES ── */
 .page-title{font-size:1.65rem;font-weight:700;margin-bottom:.25rem;background:linear-gradient(135deg,#fff,var(--text2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .page-sub{color:var(--text3);font-size:.875rem;margin-bottom:1.5rem}
+.page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem}
+.page-head .page-sub{margin-bottom:0}
+.monitor-link{align-self:center;text-decoration:none}
 
 /* ── ALERTS ── */
 .alert-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.75rem;margin-bottom:1.25rem}
@@ -276,8 +279,13 @@ tr.tr-expanded{background:rgba(59,130,246,.08)!important}
 
     <!-- DASHBOARD (admin + manager only) -->
     <div id="page-dashboard" class="hidden">
-      <div class="page-title">Dashboard Overview</div>
-      <div class="page-sub">Real-time inventory analytics</div>
+      <div class="page-head">
+        <div>
+          <div class="page-title">Dashboard Overview</div>
+          <div class="page-sub">Real-time inventory analytics</div>
+        </div>
+        <a class="btn btn-secondary monitor-link" id="grafana-shortcut" href="/grafana/d/smart-inventory-overview/smart-inventory-overview" target="_blank" rel="noopener noreferrer">📈 Open Grafana</a>
+      </div>
       <div class="stats-grid" id="stats-grid"></div>
       <div class="charts-grid">
         <div class="card">
@@ -530,6 +538,7 @@ tr.tr-expanded{background:rgba(59,130,246,.08)!important}
 const API   = '/api';
 const ALERT = '/alerts';
 const RPRT  = '/reports';
+const GRAFANA_DASHBOARD_PATH = '/grafana/d/smart-inventory-overview/smart-inventory-overview';
 
 let state = {
   user: null, items: [], locations: [], alerts: [], analytics: null,
@@ -559,6 +568,10 @@ function showPage(pg){
     .forEach(p=>hide('page-'+p));
   show('page-'+pg);
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.toggle('active', el.dataset.page===pg));
+}
+
+function grafanaDashboardUrl(){
+  return GRAFANA_DASHBOARD_PATH;
 }
 
 /* ═══════════ API ═══════════ */
@@ -649,6 +662,8 @@ function buildSidebar(){
   $('sb-username').textContent=u.full_name;
   $('sb-role').textContent=u.role;
   if(u.location_name) $('sb-loc').textContent='📍 '+u.location_name;
+  const grafanaShortcut=$('grafana-shortcut');
+  if(grafanaShortcut) grafanaShortcut.href=grafanaDashboardUrl();
   $('sb-toggle').addEventListener('click',()=>{
     $('sidebar').classList.toggle('collapsed');
     $('main').classList.toggle('collapsed');

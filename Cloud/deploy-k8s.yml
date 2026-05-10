@@ -20,10 +20,26 @@
         owner: ubuntu
         group: ubuntu
 
+    - name: Create remote monitoring directory
+      file:
+        path: /opt/smart-inventory/monitoring
+        state: directory
+        mode: '0755'
+        owner: ubuntu
+        group: ubuntu
+
     - name: Copy K8S manifest files to remote host
       copy:
         src: ../K8S/
         dest: /opt/smart-inventory/k8s/
+        owner: ubuntu
+        group: ubuntu
+        mode: '0644'
+
+    - name: Copy monitoring files to remote host
+      copy:
+        src: ../monitoring/
+        dest: /opt/smart-inventory/monitoring/
         owner: ubuntu
         group: ubuntu
         mode: '0644'
@@ -47,3 +63,33 @@
       retries: 5
       delay: 10
       until: manifest_apply.rc == 0
+
+    - name: Install Helm if missing
+      shell: |
+        if ! command -v helm >/dev/null 2>&1; then
+          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+        fi
+      args:
+        creates: /usr/local/bin/helm
+
+    - name: Add Prometheus community Helm repository
+      command: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+      register: helm_repo_add
+      failed_when: helm_repo_add.rc != 0 and 'already exists' not in helm_repo_add.stderr
+      changed_when: "'already exists' not in helm_repo_add.stderr"
+
+    - name: Update Helm repositories
+      command: helm repo update
+
+    - name: Deploy monitoring stack with Helm
+      command: >
+        helm --kubeconfig /etc/kubernetes/admin.conf upgrade --install monitoring
+        prometheus-community/kube-prometheus-stack
+        -f /opt/smart-inventory/monitoring/helm/kube-prometheus-stack-values.yaml
+
+    - name: Apply Smart Inventory monitoring resources
+      command: kubectl --kubeconfig /etc/kubernetes/admin.conf apply -k /opt/smart-inventory/monitoring
+      register: monitoring_apply
+      retries: 5
+      delay: 10
+      until: monitoring_apply.rc == 0

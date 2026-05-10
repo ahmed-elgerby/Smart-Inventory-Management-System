@@ -8,11 +8,16 @@ from flask_cors import CORS
 import psycopg2, psycopg2.extras, os, re
 from dotenv import load_dotenv
 from datetime import datetime
+from prometheus_client import Gauge, generate_latest
 
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
+
+# Prometheus metrics
+total_inventory_items = Gauge('reporting_service_total_inventory_items', 'Total number of inventory items')
+total_inventory_value = Gauge('reporting_service_total_inventory_value', 'Total value of inventory')
 
 def get_db():
     return psycopg2.connect(
@@ -285,6 +290,25 @@ def period_comparison():
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({'status': 'healthy', 'service': 'reporting', 'version': '2.0'}), 200
+
+@app.route('/metrics')
+def metrics():
+    # Update metrics from inventory summary
+    try:
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute('''
+            SELECT COUNT(*) as total_items,
+                   COALESCE(SUM(price*quantity),0) as total_value
+            FROM items''')
+        summary = dict(cur.fetchone())
+        total_inventory_items.set(summary['total_items'])
+        total_inventory_value.set(summary['total_value'])
+        conn.close()
+    except:
+        total_inventory_items.set(0)
+        total_inventory_value.set(0)
+    return generate_latest(), 200, {'Content-Type': 'text/plain; charset=utf-8'}
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5002))
