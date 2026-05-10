@@ -761,13 +761,24 @@
           "color": {
             "mode": "thresholds"
           },
+          "displayName": "Used of 5 GiB",
           "mappings": [],
+          "max": 5368709120,
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "color": "green",
                 "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 3758096384
+              },
+              {
+                "color": "red",
+                "value": 4831838208
               }
             ]
           },
@@ -783,9 +794,6 @@
       },
       "id": 11,
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -794,20 +802,19 @@
           "fields": "",
           "values": false
         },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
+        "showThresholdLabels": true,
+        "showThresholdMarkers": true
       },
       "pluginVersion": "11.2.2",
       "targets": [
         {
           "expr": "pg_database_size_bytes{datname=\"inventory\"}",
-          "legendFormat": "Size",
+          "legendFormat": "Used",
           "refId": "A"
         }
       ],
-      "title": "DB Size",
-      "type": "stat"
+      "title": "DB Storage Usage",
+      "type": "gauge"
     }
   ],
   "preload": false,
