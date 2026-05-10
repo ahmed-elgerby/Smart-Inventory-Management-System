@@ -30,38 +30,53 @@ data "aws_security_groups" "existing_alb_sg" {
   }
 }
 
-data "aws_lbs" "existing_alb" {
+data "aws_instances" "existing_controller" {
   filter {
-    name   = "name"
-    values = ["smart-inventory-alb"]
+    name   = "tag:Name"
+    values = ["Smart-Inventory-controller"]
   }
 }
 
-data "aws_lb_target_groups" "existing_tg" {
+data "aws_instances" "existing_worker" {
   filter {
-    name   = "name"
-    values = ["smart-inventory-tg"]
+    name   = "tag:Name"
+    values = ["Smart-Inventory-worker"]
   }
+}
+
+data "aws_instance" "controller" {
+  count       = length(data.aws_instances.existing_controller.ids) > 0 ? 1 : 0
+  instance_id = data.aws_instances.existing_controller.ids[0]
+}
+
+data "aws_instance" "worker" {
+  count       = length(data.aws_instances.existing_worker.ids) > 0 ? 1 : 0
+  instance_id = data.aws_instances.existing_worker.ids[0]
 }
 
 # --- LOCALS ---
 
 locals {
-  inventory_sg_id = length(data.aws_security_groups.existing_inventory_sg.ids) > 0 ? data.aws_security_groups.existing_inventory_sg.ids[0] : aws_security_group.inventory_sg[0].id
-  alb_sg_id       = length(data.aws_security_groups.existing_alb_sg.ids) > 0 ? data.aws_security_groups.existing_alb_sg.ids[0] : aws_security_group.alb_sg[0].id
-  alb_arn         = length(data.aws_lbs.existing_alb.arns) > 0 ? data.aws_lbs.existing_alb.arns[0] : aws_lb.inventory_alb[0].arn
-  alb_dns         = length(data.aws_lbs.existing_alb.arns) > 0 ? data.aws_lbs.existing_alb.dns_names[0] : aws_lb.inventory_alb[0].dns_name
-  tg_arn          = length(data.aws_lb_target_groups.existing_tg.arns) > 0 ? data.aws_lb_target_groups.existing_tg.arns[0] : aws_lb_target_group.inventory_tg[0].arn
+  inventory_sg_id = length(data.aws_security_groups.existing_inventory_sg.ids) > 0 ? data.aws_security_groups.existing_inventory_sg.ids[0] : aws_security_group.inventory_sg.id
+  alb_sg_id       = length(data.aws_security_groups.existing_alb_sg.ids) > 0 ? data.aws_security_groups.existing_alb_sg.ids[0] : aws_security_group.alb_sg.id
   create_sg       = length(data.aws_security_groups.existing_inventory_sg.ids) == 0
   create_alb_sg   = length(data.aws_security_groups.existing_alb_sg.ids) == 0
-  create_alb      = length(data.aws_lbs.existing_alb.arns) == 0
-  create_tg       = length(data.aws_lb_target_groups.existing_tg.arns) == 0
+
+  controller_public_ips = concat(aws_instance.controller[*].public_ip, [for i in data.aws_instance.controller : i.public_ip])
+  worker_public_ips     = concat(aws_instance.worker[*].public_ip, [for i in data.aws_instance.worker : i.public_ip])
+  controller_ids        = concat(aws_instance.controller[*].id, [for i in data.aws_instance.controller : i.id])
+  worker_ids            = concat(aws_instance.worker[*].id, [for i in data.aws_instance.worker : i.id])
+  controller_public_ip  = local.controller_public_ips[0]
+  worker_public_ip      = local.worker_public_ips[0]
+  controller_id         = local.controller_ids[0]
+  worker_id             = local.worker_ids[0]
+  controller_host_name  = length(data.aws_instance.controller) > 0 ? "controller-node-existing" : "controller-node"
+  worker_host_name      = length(data.aws_instance.worker) > 0 ? "worker-node-existing" : "worker-node"
 }
 
 # --- SECURITY GROUPS ---
 
 resource "aws_security_group" "inventory_sg" {
-  count       = local.create_sg ? 1 : 0
   name        = "inventory-sg"
   description = "Internal and management traffic for K8s nodes"
 
@@ -104,7 +119,6 @@ resource "aws_security_group" "inventory_sg" {
 }
 
 resource "aws_security_group" "alb_sg" {
-  count       = local.create_alb_sg ? 1 : 0
   name        = "inventory-alb-sg"
   description = "Public web traffic for ALB"
 
@@ -126,7 +140,7 @@ resource "aws_security_group" "alb_sg" {
 # --- EC2 INSTANCES ---
 
 resource "aws_instance" "controller" {
-  count                       = contains(data.aws_instances.existing_instances.tags.Name, "Smart-Inventory-controller") ? 0 : 1
+  count                       = length(data.aws_instances.existing_controller.ids) == 0 ? 1 : 0
   ami                         = "ami-0c7217cdde317cfec"
   instance_type               = "t3.small"
   vpc_security_group_ids      = [local.inventory_sg_id]
@@ -140,7 +154,7 @@ resource "aws_instance" "controller" {
 }
 
 resource "aws_instance" "worker" {
-  count                       = contains(data.aws_instances.existing_instances.tags.Name, "Smart-Inventory-worker") ? 0 : 1
+  count                       = length(data.aws_instances.existing_worker.ids) == 0 ? 1 : 0
   ami                         = "ami-0c7217cdde317cfec"
   instance_type               = "t3.small"
   vpc_security_group_ids      = [local.inventory_sg_id]
@@ -154,7 +168,7 @@ resource "aws_instance" "worker" {
 }
 
 resource "aws_ebs_volume" "controller_storage" {
-  count             = contains(data.aws_instances.existing_instances.tags.Name, "Smart-Inventory-controller") ? 0 : 1
+  count             = length(data.aws_instances.existing_controller.ids) == 0 ? 1 : 0
   availability_zone = aws_instance.controller[0].availability_zone
   size              = 5
   type              = "gp2"
@@ -164,7 +178,7 @@ resource "aws_ebs_volume" "controller_storage" {
 }
 
 resource "aws_volume_attachment" "controller_storage_attach" {
-  count       = contains(data.aws_instances.existing_instances.tags.Name, "Smart-Inventory-controller") ? 0 : 1
+  count       = length(data.aws_instances.existing_controller.ids) == 0 ? 1 : 0
   device_name = "/dev/sdf"
   volume_id   = aws_ebs_volume.controller_storage[0].id
   instance_id = aws_instance.controller[0].id
@@ -191,7 +205,6 @@ data "aws_subnets" "available" {
 # --- LOAD BALANCER ---
 
 resource "aws_lb" "inventory_alb" {
-  count             = local.create_alb ? 1 : 0
   name               = "smart-inventory-alb"
   internal           = false
   load_balancer_type = "application"
@@ -202,7 +215,6 @@ resource "aws_lb" "inventory_alb" {
 }
 
 resource "aws_lb_target_group" "inventory_tg" {
-  count       = local.create_tg ? 1 : 0
   name        = "smart-inventory-tg"
   port        = 30080
   protocol    = "HTTP"
@@ -221,20 +233,18 @@ resource "aws_lb_target_group" "inventory_tg" {
 }
 
 output "aws_lb_inventory_alb_dns_name" {
-  value = local.alb_dns
+  value = aws_lb.inventory_alb.dns_name
 }
 
 resource "aws_lb_target_group_attachment" "inventory_controller" {
-  count            = local.create_tg ? 1 : 0
-  target_group_arn = local.tg_arn
-  target_id        = contains(data.aws_instances.existing_instances.tags.Name, "Smart-Inventory-controller") ? data.aws_instances.existing_instances.ids[index(data.aws_instances.existing_instances.tags.Name, "Smart-Inventory-controller")] : aws_instance.controller[0].id
+  target_group_arn = aws_lb_target_group.inventory_tg.arn
+  target_id        = local.controller_id
   port             = 30080
 }
 
 resource "aws_lb_target_group_attachment" "inventory_worker" {
-  count            = local.create_tg ? 1 : 0
-  target_group_arn = local.tg_arn
-  target_id        = contains(data.aws_instances.existing_instances.tags.Name, "Smart-Inventory-worker") ? data.aws_instances.existing_instances.ids[index(data.aws_instances.existing_instances.tags.Name, "Smart-Inventory-worker")] : aws_instance.worker[0].id
+  target_group_arn = aws_lb_target_group.inventory_tg.arn
+  target_id        = local.worker_id
   port             = 30080
 }
 
@@ -252,11 +262,11 @@ resource "aws_lb_listener" "inventory_http" {
 # --- OUTPUTS ---
 
 output "controller_ip" {
-  value = aws_instance.instances["controller"].public_ip
+  value = local.controller_public_ip
 }
 
 output "worker_ip" {
-  value = aws_instance.instances["worker"].public_ip
+  value = local.worker_public_ip
 }
 
 output "alb_dns_name" {
@@ -268,9 +278,9 @@ resource "local_file" "ansible_inventory" {
   file_permission = "0644"
   content = <<-EOT
     [controller]
-    controller-node ansible_host=${aws_instance.instances["controller"].public_ip} ansible_user=ubuntu ansible_ssh_private_key_file=${path.module}/smart-inventory-key.pem
+    ${local.controller_host_name} ansible_host=${local.controller_public_ip} ansible_user=ubuntu ansible_ssh_private_key_file=${path.module}/smart-inventory-key.pem
 
     [worker]
-    worker-node ansible_host=${aws_instance.instances["worker"].public_ip} ansible_user=ubuntu ansible_ssh_private_key_file=${path.module}/smart-inventory-key.pem
+    ${local.worker_host_name} ansible_host=${local.worker_public_ip} ansible_user=ubuntu ansible_ssh_private_key_file=${path.module}/smart-inventory-key.pem
     EOT
 }

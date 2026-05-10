@@ -108,7 +108,7 @@ pipeline {
             }
         }
 
-        stage('Terraform Deploy') {
+        stage('Terraform Plan & Deploy') {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
                     sh '''
@@ -117,7 +117,8 @@ pipeline {
                         export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
                         export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
                         terraform init -input=false
-                        terraform apply -auto-approve
+                        terraform plan -input=false -out=tfplan
+                        terraform apply -input=false -auto-approve tfplan
                     '''
                 }
             }
