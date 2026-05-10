@@ -1,6 +1,10 @@
 resource "aws_key_pair" "deployer" {
   key_name   = "smart-inventory-key"
   public_key = tls_private_key.deployer.public_key_openssh
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "local_file" "ssh_key" {
@@ -30,55 +34,31 @@ data "aws_security_groups" "existing_alb_sg" {
   }
 }
 
-data "aws_instances" "existing_controller" {
-  filter {
-    name   = "tag:Name"
-    values = ["Smart-Inventory-controller"]
-  }
-}
-
-data "aws_instances" "existing_worker" {
-  filter {
-    name   = "tag:Name"
-    values = ["Smart-Inventory-worker"]
-  }
-}
-
-data "aws_instance" "controller" {
-  count       = length(data.aws_instances.existing_controller.ids) > 0 ? 1 : 0
-  instance_id = data.aws_instances.existing_controller.ids[0]
-}
-
-data "aws_instance" "worker" {
-  count       = length(data.aws_instances.existing_worker.ids) > 0 ? 1 : 0
-  instance_id = data.aws_instances.existing_worker.ids[0]
-}
+# Jenkins discovers an existing reusable EC2 pair before running Terraform.
+# Terraform still checks for existing security groups so name reuse does not fail.
 
 # --- LOCALS ---
 
 locals {
-  inventory_sg_id = length(data.aws_security_groups.existing_inventory_sg.ids) > 0 ? data.aws_security_groups.existing_inventory_sg.ids[0] : aws_security_group.inventory_sg.id
-  alb_sg_id       = length(data.aws_security_groups.existing_alb_sg.ids) > 0 ? data.aws_security_groups.existing_alb_sg.ids[0] : aws_security_group.alb_sg.id
+  inventory_sg_id = length(data.aws_security_groups.existing_inventory_sg.ids) > 0 ? data.aws_security_groups.existing_inventory_sg.ids[0] : aws_security_group.inventory_sg[0].id
+  alb_sg_id       = length(data.aws_security_groups.existing_alb_sg.ids) > 0 ? data.aws_security_groups.existing_alb_sg.ids[0] : aws_security_group.alb_sg[0].id
   create_sg       = length(data.aws_security_groups.existing_inventory_sg.ids) == 0
   create_alb_sg   = length(data.aws_security_groups.existing_alb_sg.ids) == 0
 
-  instances_to_create = {
-    controller = length(data.aws_instances.existing_controller.ids) == 0
-    worker     = length(data.aws_instances.existing_worker.ids) == 0
-  }
-  instance_keys = [for k, v in local.instances_to_create : k if v]
+  instance_keys = ["controller", "worker"]
 
-  controller_public_ip = length(data.aws_instances.existing_controller.ids) > 0 ? data.aws_instance.controller[0].public_ip : aws_instance.instances["controller"].public_ip
-  worker_public_ip     = length(data.aws_instances.existing_worker.ids) > 0 ? data.aws_instance.worker[0].public_ip : aws_instance.instances["worker"].public_ip
-  controller_id        = length(data.aws_instances.existing_controller.ids) > 0 ? data.aws_instance.controller[0].id : aws_instance.instances["controller"].id
-  worker_id            = length(data.aws_instances.existing_worker.ids) > 0 ? data.aws_instance.worker[0].id : aws_instance.instances["worker"].id
-  controller_host_name = length(data.aws_instances.existing_controller.ids) > 0 ? "controller-node-existing" : "controller-node"
-  worker_host_name     = length(data.aws_instances.existing_worker.ids) > 0 ? "worker-node-existing" : "worker-node"
+  controller_public_ip = aws_instance.instances["controller"].public_ip
+  worker_public_ip     = aws_instance.instances["worker"].public_ip
+  controller_id        = aws_instance.instances["controller"].id
+  worker_id            = aws_instance.instances["worker"].id
+  controller_host_name = "controller-node"
+  worker_host_name     = "worker-node"
 }
 
 # --- SECURITY GROUPS ---
 
 resource "aws_security_group" "inventory_sg" {
+  count       = local.create_sg ? 1 : 0
   name        = "inventory-sg"
   description = "Internal and management traffic for K8s nodes"
 
@@ -118,9 +98,14 @@ resource "aws_security_group" "inventory_sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_security_group" "alb_sg" {
+  count       = local.create_alb_sg ? 1 : 0
   name        = "inventory-alb-sg"
   description = "Public web traffic for ALB"
 
@@ -136,6 +121,10 @@ resource "aws_security_group" "alb_sg" {
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }
 
@@ -154,23 +143,35 @@ resource "aws_instance" "instances" {
   tags = {
     Name = "Smart-Inventory-${each.key}"
   }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_ebs_volume" "controller_storage" {
-  count             = contains(local.instance_keys, "controller") ? 1 : 0
+  count             = 1
   availability_zone = aws_instance.instances["controller"].availability_zone
   size              = 5
   type              = "gp2"
   tags = {
     Name = "smart-inventory-controller-storage"
   }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_volume_attachment" "controller_storage_attach" {
-  count       = contains(local.instance_keys, "controller") ? 1 : 0
+  count       = 1
   device_name = "/dev/sdf"
   volume_id   = aws_ebs_volume.controller_storage[0].id
   instance_id = aws_instance.instances["controller"].id
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 
@@ -202,6 +203,10 @@ resource "aws_lb" "inventory_alb" {
   subnets            = data.aws_subnets.available.ids
 
   enable_deletion_protection = false
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_lb_target_group" "inventory_tg" {
@@ -220,6 +225,10 @@ resource "aws_lb_target_group" "inventory_tg" {
     port                = "30080"
     matcher             = "200-399"
   }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 output "aws_lb_inventory_alb_dns_name" {
@@ -230,12 +239,20 @@ resource "aws_lb_target_group_attachment" "inventory_controller" {
   target_group_arn = aws_lb_target_group.inventory_tg.arn
   target_id        = local.controller_id
   port             = 30080
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_lb_target_group_attachment" "inventory_worker" {
   target_group_arn = aws_lb_target_group.inventory_tg.arn
   target_id        = local.worker_id
   port             = 30080
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_lb_listener" "inventory_http" {
@@ -246,6 +263,10 @@ resource "aws_lb_listener" "inventory_http" {
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.inventory_tg.arn
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }
 
@@ -266,7 +287,7 @@ output "alb_dns_name" {
 resource "local_file" "ansible_inventory" {
   filename        = "${path.module}/hosts.ini"
   file_permission = "0644"
-  content = <<-EOT
+  content         = <<-EOT
     [controller]
     ${local.controller_host_name} ansible_host=${local.controller_public_ip} ansible_user=ubuntu ansible_ssh_private_key_file=${path.module}/smart-inventory-key.pem
 

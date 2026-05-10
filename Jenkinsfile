@@ -21,11 +21,11 @@ pipeline {
                     # Try virtual env
                     if python3 -m venv ci_env; then
                         . ci_env/bin/activate
-                        pip install --upgrade pip setuptools wheel requests ansible
+                        pip install --upgrade pip setuptools wheel requests ansible awscli
                         deactivate
                     else
                         echo "venv creation failed, using isolated project install"
-                        python3 -m pip install --upgrade pip setuptools wheel requests ansible --target ./ci_env_lib --break-system-packages
+                        python3 -m pip install --upgrade pip setuptools wheel requests ansible awscli --target ./ci_env_lib --break-system-packages
                         export PYTHONPATH="$PWD/ci_env_lib:$PYTHONPATH"
                     fi
                 '''
@@ -108,17 +108,17 @@ pipeline {
             }
         }
 
-        stage('Terraform Plan & Deploy') {
+        stage('Discover or Terraform Deploy') {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
                     sh '''
                         set -e
+                        . ci_env/bin/activate
                         cd Cloud
                         export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
                         export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                        terraform init -input=false
-                        terraform plan -input=false -out=tfplan
-                        terraform apply -input=false -auto-approve tfplan
+                        chmod +x discover-or-terraform.sh
+                        ./discover-or-terraform.sh
                     '''
                 }
             }
@@ -146,7 +146,18 @@ pipeline {
                         echo "Deployment Complete!"
                         echo "========================================"
                         cd Cloud
-                        terraform output -raw aws_lb_inventory_alb_dns_name || echo "ALB DNS not yet available, check AWS console"
+                        if [ -f deployment.env ]; then
+                            . ./deployment.env
+                            echo "Controller IP: ${CONTROLLER_IP}"
+                            echo "Worker IP: ${WORKER_IP}"
+                            if [ -n "${ALB_DNS}" ] && [ "${ALB_DNS}" != "None" ]; then
+                                echo "ALB DNS: ${ALB_DNS}"
+                            else
+                                echo "ALB DNS not found, check AWS console"
+                            fi
+                        else
+                            terraform output -raw aws_lb_inventory_alb_dns_name || echo "ALB DNS not yet available, check AWS console"
+                        fi
                     '''
                 }
             }
@@ -160,18 +171,6 @@ pipeline {
                 docker-compose logs > logs/containers.log 2>&1 || true
             '''
             archiveArtifacts artifacts: 'logs/**/*.log,test-results/**/*.xml', allowEmptyArchive: true
-        }
-        
-        failure {
-            withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
-                sh '''
-                    echo "Ansible failed, destroying Terraform resources..."
-                    cd Cloud
-                    export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                    export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                    terraform destroy -auto-approve || echo "Terraform destroy failed or no resources to destroy"
-                '''
-            }
         }
         
         cleanup {
