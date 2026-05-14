@@ -9,10 +9,9 @@ o We are making this **project** as a part of our **DevOps course in Digital Egy
 
 **Team Members:**
 1.	Ahmed Osama Mohamed Elgerby Mohamed Elsawy ---> **Team Leader**,
-2.	Kerolos Ashraf Shawky,
-3.	Mahmoud Mohamed Abdelghany,
-4.	Manar Mohamed Hefny,
-5.	Mohamed Ramadan Abdel Moneim.	
+2.	Mahmoud Mohamed Abdelghany,
+3.	Manar Mohamed Hefny,
+4.	Mohamed Ramadan Abdel Moneim.	
   
 **Project Plan:** 
 
@@ -41,11 +40,10 @@ o We are making this **project** as a part of our **DevOps course in Digital Egy
    Writing Documentation & Preparing demo.
   
 **Roles & Responsibilities:**
-1.	Ahmed Osama Mohamed Elgerby Mohamed Elsawy --->  Project coordination and main Code, Git repository for code and scripts, Kubernetes codes for scalable services. 
-2.	Kerolos Ashraf Shawky ---> CI/CD pipeline for automated updates.
-3.	Mahmoud Mohamed Abdelghany -----> Prometheus monitoring for system and container metrics, Ansible scripts for server/service configuration.
-4.	Manar Mohamed Hefny-----> Docker containerization, Final presentation.
-5.	Mohamed Ramadan Abdel Moneim -----> Terraform scripts for AWS EC2, S3, VPC.  
+1.	Ahmed Osama Mohamed Elgerby Mohamed Elsawy --->  Project coordination and main Code, Git repository for code and scripts, Kubernetes codes for scalable services, CI/CD pipeline for automated updates.
+2.	Mahmoud Mohamed Abdelghany -----> Prometheus monitoring for system and container metrics, Ansible scripts for server/service configuration.
+3.	Manar Mohamed Hefny-----> Docker containerization, Final presentation.
+4.	Mohamed Ramadan Abdel Moneim -----> Terraform scripts for AWS EC2, EBS, ALB.  
  
 **Instructor**  
 
