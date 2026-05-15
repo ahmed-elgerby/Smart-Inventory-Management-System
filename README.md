@@ -58,5 +58,7 @@ Jenkins, Docker, Kubernetes, Prometheus, Grafana, Ansible, Terraform, AWS EC2/S3
 **You can find the full project files here:** 
 https://github.com/ahmed-elgerby/Smart-Inventory-Management-System/
 
+
+here you can see my video
 https://drive.google.com/drive/folders/1IGwzl-aBGSWgK6CpqBJdhwGEWTBDDaaZ?usp=drive_link
 
